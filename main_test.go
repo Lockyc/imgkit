@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 )
@@ -16,11 +17,12 @@ func TestRun(t *testing.T) {
 		{nil, 2, "", "usage: imgkit"},
 		{[]string{"version"}, 0, version, ""},
 		{[]string{"help"}, 0, "usage: imgkit", ""},
+		{[]string{"help"}, 0, "version", ""},
 		{[]string{"nope"}, 2, "", `unknown command "nope"`},
 	}
 	for _, c := range cases {
 		var out, errb bytes.Buffer
-		if got := run(c.args, &out, &errb); got != c.code {
+		if got := run(context.Background(), c.args, &out, &errb); got != c.code {
 			t.Errorf("run(%q) = %d, want %d", c.args, got, c.code)
 		}
 		if !strings.Contains(out.String(), c.inStdout) {
@@ -28,6 +30,15 @@ func TestRun(t *testing.T) {
 		}
 		if !strings.Contains(errb.String(), c.inStderr) {
 			t.Errorf("run(%q) stderr %q lacks %q", c.args, errb.String(), c.inStderr)
+		}
+	}
+}
+
+func TestEveryCommandIsInUsage(t *testing.T) {
+	u := usage()
+	for _, c := range commands {
+		if !strings.Contains(u, "  "+c.name+" ") {
+			t.Errorf("usage lacks %q", c.name)
 		}
 	}
 }
