@@ -110,7 +110,8 @@ func Find(e pins.Engine) (string, error) {
 	return p, nil
 }
 
-// Cmd is one engine invocation.
+// Cmd is one engine invocation. Inputs and Outputs are paths as imgkit sees
+// them, relative to its own working directory rather than Dir.
 type Cmd struct {
 	Engine      string // pin-table name; resolves the executable unless Path is set
 	Path        string // an executable imgkit built itself; Engine is then only a label
@@ -121,6 +122,7 @@ type Cmd struct {
 	Timeout     time.Duration // 0 means DefaultTimeout
 	StderrFatal bool          // any stderr output fails the call
 	OKExit      []int         // non-zero exit statuses that are not failures
+	Inputs      []string      // files the engine reads; none may also be an output
 	Outputs     []string      // files that must exist and be non-empty afterwards
 }
 
@@ -138,8 +140,22 @@ func (e *RunError) Error() string {
 	return msg
 }
 
-// Run executes c under the package rules.
+// Run executes c under the package rules. It refuses a call whose output is
+// also one of its inputs before touching anything, because deleting the
+// stale output would destroy the source.
 func Run(ctx context.Context, c Cmd) (Result, error) {
+	for _, o := range c.Outputs {
+		for _, in := range c.Inputs {
+			if sameFile(in, o) {
+				return Result{}, fmt.Errorf("%s: %s is both an input and an output; write the result elsewhere", c.Engine, o)
+			}
+		}
+	}
+	for _, o := range c.Outputs {
+		if err := os.Remove(o); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return Result{}, err
+		}
+	}
 	path := c.Path
 	if path == "" {
 		p, err := Resolve(c.Engine)
@@ -147,11 +163,6 @@ func Run(ctx context.Context, c Cmd) (Result, error) {
 			return Result{}, err
 		}
 		path = p
-	}
-	for _, o := range c.Outputs {
-		if err := os.Remove(o); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return Result{}, err
-		}
 	}
 	res, err := run(ctx, path, c)
 	if err != nil {
@@ -162,6 +173,23 @@ func Run(ctx context.Context, c Cmd) (Result, error) {
 	return res, err
 }
 
+// sameFile reports whether a and b name one file: the same inode when both
+// exist, else the same absolute path.
+func sameFile(a, b string) bool {
+	fa, errA := os.Stat(a)
+	fb, errB := os.Stat(b)
+	if errA == nil && errB == nil {
+		return os.SameFile(fa, fb)
+	}
+	absA, errA := filepath.Abs(a)
+	absB, errB := filepath.Abs(b)
+	return errA == nil && errB == nil && absA == absB
+}
+
+// run gives the engine files, not pipes, for stdin, stdout and stderr, so
+// Wait returns when the engine exits rather than when the last process
+// holding its output closes it; then it kills the engine's process group,
+// so nothing the engine left behind outlives the call.
 func run(ctx context.Context, path string, c Cmd) (Result, error) {
 	timeout := c.Timeout
 	if timeout == 0 {
@@ -174,14 +202,39 @@ func run(ctx context.Context, path string, c Cmd) (Result, error) {
 	if len(c.Env) > 0 {
 		cmd.Env = append(os.Environ(), c.Env...)
 	}
-	cmd.Stdin = c.Stdin
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	stdout, err := scratch()
+	if err != nil {
+		return Result{}, err
+	}
+	defer stdout.Close()
+	stderr, err := scratch()
+	if err != nil {
+		return Result{}, err
+	}
+	defer stderr.Close()
+	cmd.Stdout, cmd.Stderr = stdout, stderr
+	if c.Stdin != nil {
+		stdin, err := scratch()
+		if err != nil {
+			return Result{}, err
+		}
+		defer stdin.Close()
+		if _, err := io.Copy(stdin, c.Stdin); err != nil {
+			return Result{}, err
+		}
+		if _, err := stdin.Seek(0, io.SeekStart); err != nil {
+			return Result{}, err
+		}
+		cmd.Stdin = stdin
+	}
 	killGroupOnCancel(cmd)
-	err := cmd.Run()
-	res := Result{Stdout: stdout.Bytes(), Stderr: stderr.Bytes()}
+	if err = cmd.Start(); err == nil {
+		err = cmd.Wait()
+		killGroup(cmd)
+	}
+	res := Result{Stdout: readAll(stdout), Stderr: readAll(stderr)}
 	fail := func(reason string) (Result, error) {
-		return res, &RunError{Engine: c.Engine, Reason: reason, Stderr: stderr.String()}
+		return res, &RunError{Engine: c.Engine, Reason: reason, Stderr: string(res.Stderr)}
 	}
 	switch {
 	case errors.Is(ctx.Err(), context.DeadlineExceeded):
@@ -192,15 +245,9 @@ func run(ctx context.Context, path string, c Cmd) (Result, error) {
 	if err != nil {
 		var ee *exec.ExitError
 		if !errors.As(err, &ee) {
-			// Check for WaitDelay with successful exit: a child process survived
-			// and held stderr open, but the parent exited successfully.
-			if errors.Is(err, exec.ErrWaitDelay) && cmd.ProcessState != nil && cmd.ProcessState.ExitCode() == 0 {
-				// Fall through to stderr and output checks with success exit code
-				err = nil
-			} else {
-				return fail(err.Error())
-			}
-		} else if !slices.Contains(c.OKExit, ee.ExitCode()) {
+			return fail(err.Error())
+		}
+		if !slices.Contains(c.OKExit, ee.ExitCode()) {
 			return fail(ee.Error())
 		}
 	}
@@ -213,6 +260,28 @@ func run(ctx context.Context, path string, c Cmd) (Result, error) {
 		}
 	}
 	return res, nil
+}
+
+// scratch is an anonymous temporary file: unlinked at once, gone on Close.
+func scratch() (*os.File, error) {
+	f, err := os.CreateTemp("", "imgkit-")
+	if err != nil {
+		return nil, err
+	}
+	if err := os.Remove(f.Name()); err != nil {
+		f.Close()
+		return nil, err
+	}
+	return f, nil
+}
+
+// readAll reads a scratch file the engine wrote from the start.
+func readAll(f *os.File) []byte {
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return nil
+	}
+	b, _ := io.ReadAll(f)
+	return b
 }
 
 // Version reads a Minimum engine's version. The exit status is ignored,

@@ -85,57 +85,99 @@ func TestRunStderrPolicy(t *testing.T) {
 }
 
 func TestRunSuccessWithStrayChild(t *testing.T) {
-	// A child that inherits stderr but is not in the process group survives the parent.
-	// It should not cause Run to fail or remove outputs.
-	enginetest.Stub(t, "magick", `printf ok > "$1"; (sleep 30 >&2 &); exit 0`)
-	out := filepath.Join(t.TempDir(), "out.png")
+	// The backgrounded sleep stays in the engine's process group and holds
+	// stderr open after the leader exits 0. Run must return at the leader's
+	// exit, keep the output, and leave no group member behind.
+	dir := t.TempDir()
+	out, pidfile := filepath.Join(dir, "out.png"), filepath.Join(dir, "child.pid")
+	enginetest.Stub(t, "magick", `printf ok > "$1"; sleep 30 >&2 & echo $! > "$2"; exit 0`)
 	start := time.Now()
-	_, err := engine.Run(ctx, engine.Cmd{Engine: "magick", Args: []string{out}, Outputs: []string{out}})
-	elapsed := time.Since(start)
+	_, err := engine.Run(ctx, engine.Cmd{Engine: "magick", Args: []string{out, pidfile}, Outputs: []string{out}})
+	if elapsed := time.Since(start); elapsed > 1500*time.Millisecond {
+		t.Fatalf("Run took %v; it waited on the stray child", elapsed)
+	}
 	if err != nil {
 		t.Fatalf("err = %v", err)
-	}
-	if elapsed > 6*time.Second {
-		t.Fatalf("took %v, expected ~5s (WaitDelay) + small overhead", elapsed)
 	}
 	if _, err := os.Stat(out); err != nil {
 		t.Fatal("output file was removed on success")
 	}
+	waitGone(t, readPid(t, pidfile))
+}
+
+// readPid reads the pid a stub wrote to file.
+func readPid(t *testing.T, file string) int {
+	t.Helper()
+	b, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pid int
+	if _, err := fmt.Sscanf(strings.TrimSpace(string(b)), "%d", &pid); err != nil {
+		t.Fatalf("invalid pid in file: %v", err)
+	}
+	return pid
+}
+
+// waitGone fails unless pid stops existing within a second.
+func waitGone(t *testing.T, pid int) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for syscall.Kill(pid, 0) != syscall.ESRCH {
+		if time.Now().After(deadline) {
+			t.Fatalf("process %d still alive", pid)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestRunRefusesOutputThatIsAnInput(t *testing.T) {
+	enginetest.Stub(t, "magick", `printf new > "$1"`)
+	dir := t.TempDir()
+	src := filepath.Join(dir, "in.png")
+	os.WriteFile(src, []byte("source"), 0o644)
+	for _, c := range []struct{ in, out string }{
+		{src, src},
+		{src, filepath.Join(dir, ".", "in.png")},
+		{filepath.Join(dir, "missing.png"), filepath.Join(dir, "sub", "..", "missing.png")},
+	} {
+		_, err := engine.Run(ctx, engine.Cmd{Engine: "magick", Args: []string{c.out}, Inputs: []string{c.in}, Outputs: []string{c.out}})
+		if err == nil || !strings.Contains(err.Error(), "is both an input and an output") {
+			t.Fatalf("in %s, out %s: err = %v, want refusal", c.in, c.out, err)
+		}
+	}
+	if b, _ := os.ReadFile(src); string(b) != "source" {
+		t.Fatalf("source = %q, want it untouched", b)
+	}
+}
+
+func TestRunRemovesStaleOutputWhenEngineMissing(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv(engine.EnvOverride("magick"), "")
+	out := filepath.Join(t.TempDir(), "out.png")
+	os.WriteFile(out, []byte("stale"), 0o644)
+	var ni *engine.NotInstalledError
+	if _, err := engine.Run(ctx, engine.Cmd{Engine: "magick", Outputs: []string{out}}); !errors.As(err, &ni) {
+		t.Fatalf("err = %v, want NotInstalledError", err)
+	}
+	if _, err := os.Stat(out); !os.IsNotExist(err) {
+		t.Fatal("stale output survived a missing engine")
+	}
 }
 
 func TestRunTimeoutRemovesPartialOutput(t *testing.T) {
-	tmpdir := t.TempDir()
-	pidfile := filepath.Join(tmpdir, "child.pid")
-	enginetest.Stub(t, "magick", `printf partial > "$1"; sleep 30 & echo $! > "$2"; wait`)
-	out := filepath.Join(tmpdir, "out.png")
+	dir := t.TempDir()
+	out, pidfile := filepath.Join(dir, "out.png"), filepath.Join(dir, "child.pid")
+	enginetest.Stub(t, "magick", `sleep 30 & echo $! > "$2"; printf partial > "$1"; wait`)
 	start := time.Now()
-	_, err := engine.Run(ctx, engine.Cmd{Engine: "magick", Args: []string{out, pidfile}, Outputs: []string{out}, Timeout: 300 * time.Millisecond})
+	_, err := engine.Run(ctx, engine.Cmd{Engine: "magick", Args: []string{out, pidfile}, Outputs: []string{out}, Timeout: time.Second})
 	if err == nil || !strings.Contains(err.Error(), "timed out") {
 		t.Fatalf("err = %v", err)
 	}
 	if time.Since(start) > 3*time.Second {
 		t.Fatal("Run took too long; process group may not have been killed")
 	}
-	// Verify the background child was killed
-	b, err := os.ReadFile(pidfile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	pidStr := strings.TrimSpace(string(b))
-	var pid int
-	if _, err := fmt.Sscanf(pidStr, "%d", &pid); err != nil {
-		t.Fatalf("invalid pid in file: %v", err)
-	}
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if err := syscall.Kill(pid, 0); err != nil && err == syscall.ESRCH {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	if err := syscall.Kill(pid, 0); err == nil {
-		t.Fatal("background child still alive after timeout")
-	}
+	waitGone(t, readPid(t, pidfile))
 	if _, err := os.Stat(out); !os.IsNotExist(err) {
 		t.Fatal("partial output survived a timeout")
 	}
