@@ -192,9 +192,15 @@ func run(ctx context.Context, path string, c Cmd) (Result, error) {
 	if err != nil {
 		var ee *exec.ExitError
 		if !errors.As(err, &ee) {
-			return fail(err.Error())
-		}
-		if !slices.Contains(c.OKExit, ee.ExitCode()) {
+			// Check for WaitDelay with successful exit: a child process survived
+			// and held stderr open, but the parent exited successfully.
+			if errors.Is(err, exec.ErrWaitDelay) && cmd.ProcessState != nil && cmd.ProcessState.ExitCode() == 0 {
+				// Fall through to stderr and output checks with success exit code
+				err = nil
+			} else {
+				return fail(err.Error())
+			}
+		} else if !slices.Contains(c.OKExit, ee.ExitCode()) {
 			return fail(ee.Error())
 		}
 	}
