@@ -2,7 +2,7 @@
 type: architecture
 links:
   - rel: see-also
-    to: roadmap.md
+    to: docs/roadmap.md
     note: the order the pieces below get built in
 ---
 

@@ -2,7 +2,7 @@
 type: roadmap
 links:
   - rel: see-also
-    to: design.md
+    to: docs/design.md
     note: the architecture each phase builds toward
 ---
 
