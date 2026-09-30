@@ -20,6 +20,11 @@ build:
 test:
     go test ./...
 
+# Run the quality cases over quality/ (needs every engine and model; local only)
+[group("check")]
+quality:
+    go test -tags quality -count=1 -v ./quality/
+
 # go vet static checks
 [group("check")]
 vet:
@@ -42,6 +47,7 @@ gate:
       exit 1
     fi
     go vet ./...
+    go vet -tags quality ./quality/
     go test ./...
     echo "✓ gate passed"
 

@@ -1,0 +1,3 @@
+# Quality cases: `just quality` runs each one and checks its metric against
+# its threshold. The fields are documented on quality.Case. Thresholds only
+# ever get stricter.

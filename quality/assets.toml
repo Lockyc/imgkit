@@ -1,0 +1,4 @@
+# Every file in quality/assets/, with where it came from and its licence.
+# registry_test.go fails when a file is missing from this list, a listed
+# file is missing, or a sha256 differs. `source` is a URL, or "synthetic"
+# for files made for imgkit (then `recipe` says how).
