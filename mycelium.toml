@@ -1,0 +1,14 @@
+name    = "imgkit"
+summary = "Go CLI of generic image and render operations for print and web pipelines: cutout, inpaint, infill, upscale, colour grade, HTML→PNG/PDF render, press-ready PDF, diff, font embed, QR — pinned engines, measured quality"
+kind    = "tool"
+status  = "active"
+tags    = ["images", "print", "render", "cli", "pipelines"]
+stack   = ["go", "python"]
+
+[github]
+topics_extra = ["cli", "golang", "image-processing", "imagemagick", "headless-chrome", "ghostscript", "background-removal", "print"]
+
+[[provides]]
+name    = "image-render-ops"
+summary = "go-installable `imgkit` binary: subject cutout to RGBA (Vision/BiRefNet + tiled ViTMatte), LaMa inpaint, blur-pyramid infill, Real-ESRGAN upscale, HALD grade fit/apply, guarded headless-Chrome HTML→PNG/PDF, outlined-CMYK press PDF with soft-proof gate, aligned image diff, font data-URI CSS, QR SVG; `imgkit.toml` can forbid the pixel-synthesising ops"
+url     = "https://github.com/lockyc/imgkit"
