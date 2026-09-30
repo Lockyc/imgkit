@@ -17,7 +17,8 @@ links:
 A Go CLI of generic image and render operations for print and web pipelines.
 The command set is in [README.md](README.md), the architecture in
 [docs/design.md](docs/design.md), and **what's next in
-[docs/roadmap.md](docs/roadmap.md)**. Only the CLI stub exists today.
+[docs/roadmap.md](docs/roadmap.md)**. Phase 1 (engines, pins, doctor, policy,
+quality harness) is built.
 
 ## When imgkit falls short, improve imgkit
 

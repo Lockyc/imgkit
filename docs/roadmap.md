@@ -13,7 +13,7 @@ Phases in build order. Each ships when its acceptance gate passes.
 | Phase | Lane | Scope | Gate |
 |---|---|---|---|
 | 0 | Shipped | Repo, CLI stub, `version`, CI | `just gate` |
-| 1 | Not started | `internal/engine`, `internal/pins`, `doctor`, the `imgkit.toml` synthesis policy, the `quality/` harness | stub-engine tests; `doctor` reports this machine accurately |
+| 1 | Shipped | `internal/engine`, `internal/pins`, `doctor`, the `imgkit.toml` synthesis policy, the `quality/` harness | stub-engine tests; `doctor` reports this machine accurately |
 | 2 | Not started | Deterministic ops: `render`, `press`, `diff`, `fonts`, `qr`, `grade apply` | unit tests and quality cases pass |
 | 3 | Not started | ML ops: `cutout`, `grade fit`, `inpaint`, `upscale`, `infill` | quality cases pass at their recorded thresholds |
 | 4 | Not started | `v0.1.0` release | release gate green; README curated |

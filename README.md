@@ -13,9 +13,9 @@ against a committed set of test images rather than judged by eye.
 
 ## Status
 
-Nothing is built yet: `imgkit version` is the only command. The command set
-below is the design, not a feature list. The build order is in
-[docs/roadmap.md](docs/roadmap.md), and how it is built is in
+`version` and `doctor` work; the rest of the table is being built (see the
+roadmap). The command set below is the design, not a feature list. The
+build order is in [docs/roadmap.md](docs/roadmap.md), and how it is built is in
 [docs/design.md](docs/design.md).
 
 | Command | Does |
@@ -30,7 +30,7 @@ below is the design, not a feature list. The build order is in
 | `diff` | Compares two images after lining them up, so a small shift doesn't fail everything |
 | `fonts` | Embeds web fonts into a CSS file so a page renders from the filesystem |
 | `qr` | Makes a QR code SVG that any phone camera decodes |
-| `doctor` | Checks every engine and installs any missing ones at pinned versions |
+| `doctor` | Checks every engine against its pin, installs the ones imgkit manages, and prints the install command for the rest |
 
 ⚠ These commands create pixels the source never had. A project that forbids
 this puts `synthesis = "forbid"` in an `imgkit.toml`, and they refuse to run.
@@ -47,4 +47,5 @@ go install github.com/lockyc/imgkit@latest
 just build    # ./imgkit
 just test
 just gate     # gofmt check + vet + tests
+just quality  # quality cases over quality/ (needs every engine and model)
 ```

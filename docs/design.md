@@ -8,8 +8,8 @@ links:
 
 # imgkit — design
 
-The architecture imgkit is being built to. Nothing below the CLI stub exists
-yet; [roadmap.md](roadmap.md) tracks what has landed.
+The architecture imgkit is being built to. Phase 1 (engines, pins, doctor,
+policy, quality harness) is built; [roadmap.md](roadmap.md) tracks the rest.
 
 ## Shape
 
@@ -46,14 +46,17 @@ quality/           the test images, their licences, and cases.toml
 reads it, and so does every "not installed" error, which prints the exact
 install command.
 
+`IMGKIT_ENGINE_<NAME>` points imgkit at a specific executable for an engine,
+ahead of the data directory and `PATH`; tests use it to stand in sh stubs.
+
 | Engine | How it is pinned |
 |---|---|
 | ImageMagick 7 | minimum version |
-| chrome-headless-shell | exact version, installed by `doctor --install` under `$XDG_DATA_HOME/imgkit/` |
-| Real-ESRGAN (ncnn-vulkan) | release version and sha256, installed by `doctor --install` |
+| chrome-headless-shell | exact version and sha256, installed by `doctor --install` under `$XDG_DATA_HOME/imgkit/` |
+| Real-ESRGAN (ncnn-vulkan) | exact version and sha256, installed by `doctor --install` under `$XDG_DATA_HOME/imgkit/` |
 | Ghostscript, poppler, qpdf, qrencode | minimum version |
 | Apple Vision | the OS; macOS 14 or later |
-| Python ML (ViTMatte, BiRefNet, LaMa, grade fit) | PEP 723 header with exact versions and `exclude-newer`, Hugging Face model revision pinned by commit |
+| Python ML (ViTMatte, BiRefNet, LaMa, grade fit) | PEP 723 header with `exclude-newer`, and a committed `uv lock --script` lockfile run with `--locked`; Hugging Face model revision pinned by commit |
 
 Python runs only for the ML steps, where no Go, Rust or shell tool of
 comparable quality exists. `uv` is the only Python tool a user installs.
@@ -106,7 +109,8 @@ plausible-looking wrong file behind.
 
 `go test ./...` covers everything that needs no model or browser, using stub
 engines on `PATH`. `just quality` runs every operation over `quality/`: openly
-licensed or synthetic test images, each case in `quality/cases.toml` with its
-metric and threshold (fringe pixels, see-through pixels inside the subject,
-seam visibility, a refused oversized render). It needs the models and runs
+licensed or synthetic test images, each asset registered in `quality/assets.toml`
+with its source and licence, each case in `quality/cases.toml` (fields:
+`quality.Case`) with its metric and threshold (fringe pixels, see-through
+pixels inside the subject, seam visibility, a refused oversized render). It needs the models and runs
 locally, not in CI.
