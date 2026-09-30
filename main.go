@@ -11,6 +11,8 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+
+	"github.com/lockyc/imgkit/internal/doctor"
 )
 
 type command struct {
@@ -22,6 +24,7 @@ type command struct {
 // commands is the dispatch table and the usage text, in display order.
 var commands = []command{
 	{"version", "print the imgkit version", versionMain},
+	{"doctor", "check every engine; --install fetches the ones imgkit manages", doctor.Main},
 }
 
 func main() {
