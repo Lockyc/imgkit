@@ -23,7 +23,7 @@ below is the design, not a feature list. The build order is in
 |---|---|
 | `cutout` | Lifts the subject out of an image as RGBA, down to hair and fur |
 | `inpaint` ⚠ | Fills a masked region with LaMa |
-| `infill` ⚠ | Fills a hole in a flat ground by blending blurred copies of its surroundings, then adds grain to match |
+| `infill` ⚠ | Fills a hole in a flat ground by blending blurred copies of its surroundings, then lays the ground's own grain over it |
 | `upscale` ⚠ | Enlarges 4× with Real-ESRGAN |
 | `grade fit` / `grade apply` | Recovers a reference image's colour grade as a lookup table, then applies it, keeping transparency |
 | `render` | HTML to PNG or PDF with headless Chrome, guarded against Chrome's silent failures |

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"image"
+	"image/color"
 	"os"
 	"path/filepath"
 	"slices"
@@ -20,27 +21,54 @@ func pngOf(t *testing.T, dir, name string, w, h int) string {
 	return p
 }
 
-func TestInfill(t *testing.T) {
-	dir := t.TempDir()
-	t.Chdir(dir)
-	log := enginetest.Stub(t, "magick", `for a in "$@"; do last=$a; done; printf png > "$last"`)
-	in, mask, out := pngOf(t, dir, "in.png", 40, 30), pngOf(t, dir, "m.png", 40, 30), filepath.Join(dir, "out.png")
-	var o, e bytes.Buffer
-	if code := Main(context.Background(), []string{"--mask", mask, "--levels", "30,6", in, out}, &o, &e); code != 0 {
-		t.Fatalf("code %d: %s", code, e.String())
-	}
-	calls := enginetest.Calls(t, log)
-	if len(calls) != 5 { // holes, 2 blurs, fill, composite
-		t.Fatalf("%d magick calls, want 5: %q", len(calls), calls)
-	}
-	if !slices.Contains(calls[1], "0x30") || !slices.Contains(calls[2], "0x6") {
-		t.Errorf("blur levels: %q %q", calls[1], calls[2])
-	}
-	fill := calls[3]
-	for _, want := range []string{"-seed", "1", "-attenuate", "0.25", "+noise", "Gaussian"} {
-		if !slices.Contains(fill, want) {
-			t.Errorf("fill lacks %s: %q", want, fill)
+// holedPNG writes a w x h grey image with grain and a transparent square in
+// the middle: what the magick stub hands back for every call, so the Go
+// grain step has a hole and a ground to work on.
+func holedPNG(t *testing.T, dir string, w, h int) string {
+	img := image.NewNRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			if x < w/2-5 || x >= w/2+5 || y < h/2-5 || y >= h/2+5 {
+				v := uint8(100 + (x*7+y*13)%40)
+				img.Set(x, y, color.NRGBA{v, v, v, 255})
+			}
 		}
+	}
+	p := filepath.Join(dir, "fixture.png")
+	if err := raster.SavePNG(p, img); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func TestInfill(t *testing.T) {
+	for _, grain := range []string{"1", "0"} {
+		t.Run("grain "+grain, func(t *testing.T) {
+			dir := t.TempDir()
+			t.Chdir(dir)
+			t.Setenv("FIXTURE", holedPNG(t, dir, 40, 30))
+			log := enginetest.Stub(t, "magick", `for a in "$@"; do last=$a; done; cp "$FIXTURE" "$last"`)
+			in, mask, out := pngOf(t, dir, "in.png", 40, 30), pngOf(t, dir, "m.png", 40, 30), filepath.Join(dir, "out.png")
+			var o, e bytes.Buffer
+			if code := Main(context.Background(), []string{"--mask", mask, "--levels", "30,6", "--grain", grain, in, out}, &o, &e); code != 0 {
+				t.Fatalf("code %d: %s", code, e.String())
+			}
+			calls := enginetest.Calls(t, log)
+			if len(calls) != 5 { // holes, 2 blurs, fill, composite
+				t.Fatalf("%d magick calls, want 5: %q", len(calls), calls)
+			}
+			if !slices.Contains(calls[1], "0x30") || !slices.Contains(calls[2], "0x6") {
+				t.Errorf("blur levels: %q %q", calls[1], calls[2])
+			}
+			if slices.Contains(calls[3], "+noise") {
+				t.Errorf("fill adds magick noise: %q", calls[3])
+			}
+			want := map[string]string{"1": "grained.png", "0": "fill.png"}[grain]
+			comp := calls[4]
+			if filepath.Base(comp[0]) != "holes.png" || filepath.Base(comp[1]) != want || comp[len(comp)-1] != out {
+				t.Errorf("composite takes %q, want holes.png, %s, then %s", comp, want, out)
+			}
+		})
 	}
 }
 

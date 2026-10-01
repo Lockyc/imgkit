@@ -1,9 +1,10 @@
 // Package infill fills holes in a flat ground (paper, a painted wall, sky)
 // from their surroundings: each level blurs the image with its holes
 // transparent, keeps what the blur reached, and the levels stack from
-// coarse to fine, so a hole takes the colour of what is nearest. A faint
-// seeded Gaussian grain then keeps the patch from being flatter than the
-// ground around it. It synthesises pixels, so imgkit.toml can forbid it.
+// coarse to fine, so a hole takes the colour of what is nearest. The blur
+// carries no grain, so texture then lays the ground's own fine detail,
+// in patches taken from around the hole, over the fill. It synthesises
+// pixels, so imgkit.toml can forbid it.
 package infill
 
 import (
@@ -21,15 +22,15 @@ import (
 	"github.com/lockyc/imgkit/internal/policy"
 )
 
-const usage = "infill --mask mask.png [--levels 150,60,20,6] [--grain 0.25] [--seed 1] <in> <out.png>"
+const usage = "infill --mask mask.png [--levels 150,60,20,6] [--grain 1] [--seed 1] <in> <out.png>"
 
 // Main runs `imgkit infill`.
 func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fs := cli.Flags("infill", usage, stderr)
 	mask := fs.String("mask", "", "white where the holes are, same size as the image (required)")
-	levels := fs.String("levels", "150,60,20,6", "blur radii in px, coarse to fine")
-	grain := fs.Float64("grain", 0.25, "Gaussian grain strength (0 for none)")
-	seed := fs.Int("seed", 1, "grain seed")
+	levels := fs.String("levels", "150,60,20,6", "blur radii in px, coarse to fine; the grain is the detail finer than the last")
+	grain := fs.Float64("grain", 1, "strength of the ground's grain laid over the fill: 1 matches the ground, 0 leaves it smooth")
+	seed := fs.Int("seed", 1, "seed for which patches of the ground make the grain")
 	rest, code, ok := cli.Parse(fs, args, 2)
 	if !ok {
 		return code
@@ -105,12 +106,18 @@ func run(ctx context.Context, in, mask, out string, radii []int, grain float64, 
 	for _, l := range layers[1:] {
 		args = append(args, l, "-compose", "over", "-composite")
 	}
-	args = append(args, "-alpha", "off")
-	if grain > 0 {
-		args = append(args, "-seed", strconv.Itoa(seed), "-attenuate", strconv.FormatFloat(grain, 'f', -1, 64), "+noise", "Gaussian")
-	}
-	if err := magick(layers, append(args, fill)...); err != nil {
+	if err := magick(layers, append(args, "-alpha", "off", fill)...); err != nil {
 		return err
 	}
-	return magick([]string{fill, holes}, fill, holes, "-compose", "over", "-composite", out)
+	if grain > 0 {
+		// The finest level is the scale the fill already follows, so the
+		// grain is the detail finer than it.
+		grained := filepath.Join(tmp, "grained.png")
+		if err := texture(holes, fill, grained, float64(radii[len(radii)-1]), grain, seed); err != nil {
+			return err
+		}
+		fill = grained
+	}
+	// holes first, so the result keeps the source's bit depth.
+	return magick([]string{holes, fill}, holes, fill, "-compose", "dst-over", "-composite", "-alpha", "off", out)
 }
