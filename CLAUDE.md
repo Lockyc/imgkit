@@ -46,7 +46,8 @@ around imgkit, is the failure this rule exists to stop.
   `internal/pins`; upstream CLIs (LaMa) through `uv tool run`.
 - **Portable.** No GNU-only or BSD-only flags in anything imgkit runs.
 - **Mark synthesis.** A command that creates pixels the source never had
-  honours the `imgkit.toml` policy (docs/design.md → Synthesis policy).
+  sets `synthesises` in main.go's command table, which applies the
+  `imgkit.toml` policy (docs/design.md → Synthesis policy).
 - **Public repo, self-contained tree.** No machine paths, no private
   hostnames, no consuming project's assets. `quality/` holds only openly
   licensed or synthetic images, each with its source and licence recorded.
