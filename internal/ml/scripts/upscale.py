@@ -14,12 +14,12 @@ that survive in the small image and invents no texture.
 
 The model runs on TILE x TILE px tiles, each with PAD px of context on every
 side that is cut away again, and each tile is written straight into an
-8-bit output array. Peak memory is that array and the PIL image made
-from it (about 7 bytes per output pixel, 11 with alpha), the model and one
-tile's activations: 2.3 GB for a 2000x3000 source enlarged to 8000x12000
-on MPS. Alpha, which the model
-does not take, is enlarged with Lanczos, and dropped when it is opaque
-everywhere.
+8-bit output array, so the output is 8-bit. Peak resident memory (RSS) is
+the source as a float32 tensor (about 12 bytes per source pixel), that
+output array and the PIL image made from it (about 7 bytes per output
+pixel), the model and one tile's activations: 2.3 GB for a 2000x3000
+source enlarged to 8000x12000 on MPS. Alpha, which the model does not
+take, is enlarged with Lanczos, and dropped when it is opaque everywhere.
 """
 
 import argparse
@@ -56,7 +56,6 @@ def main() -> None:
     rgb = np.asarray(src.convert("RGB"), dtype=np.float32) / 255
     h, w, _ = rgb.shape
     x = torch.from_numpy(rgb).permute(2, 0, 1)[None]
-    del rgb
     out = np.empty((h * scale, w * scale, 3), dtype=np.uint8)
     tiles = 0
     for y0 in range(0, h, TILE):

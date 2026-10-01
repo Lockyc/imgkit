@@ -49,3 +49,23 @@ Phases run in order. Within a phase, order is open.
   rim, smudge it in. Deferred because no measured case shows it. Unlock:
   a `quality/` case with a small dark object within about 2× the finest
   radius of a hole's border, then a per-level pull measured on it.
+- **cutout alpha in the sure regions.** On every tile with unknown
+  pixels, the full-resolution pass keeps ViTMatte's alpha across the whole
+  tile, including where its trimap says sure foreground or background,
+  rather than pinning those pixels to opaque and clear. Deferred because no
+  measured case shows ViTMatte straying there. Unlock: a `quality/` case
+  where it does, then alpha pinned to the trimap outside the unknown band,
+  measured on it.
+- **infill edge stops by luma alone.** The edge test compares luma, so a
+  ground of the same lightness but a different hue reads as one ground and
+  is not cut off; and a strip narrower than about twice the smoothing
+  radius is never cut off at all. Deferred because no measured case has
+  either. Unlock: a `quality/` case with a same-luma, different-hue ground
+  beside a hole, or a thin strip of a different ground, then an edge test
+  that sees hue or a finer smoothing, measured on it.
+- **upscale colour bleed at alpha edges.** DAT enlarges the colour under
+  transparent pixels as if it were picture, so a cut-out whose transparent
+  pixels hold junk colour bleeds it into the enlarged soft edge. Deferred
+  because no measured case has such a source. Unlock: a `quality/` case
+  with a cut-out over junk RGB, then the colour extended under the
+  transparency before enlarging, measured on it.

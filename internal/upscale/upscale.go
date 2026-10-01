@@ -22,7 +22,7 @@ import (
 	"github.com/lockyc/imgkit/internal/policy"
 )
 
-const usage = "upscale <in> <out.png>"
+const usage = "upscale <in> <out.png>\n\nThe output is an 8-bit PNG, alpha kept where the source has any."
 
 // Main runs `imgkit upscale`.
 func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
