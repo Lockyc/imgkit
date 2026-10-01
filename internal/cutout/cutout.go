@@ -28,7 +28,12 @@ import (
 
 const usage = "cutout [--coarse vision|birefnet] [--height PX] [--tile PX] [--band-in D] [--band-out D] [--despill PRESET] [--despill-hue A:B] [--despill-clean A:B] [--despill-chroma A:B] [--despill-lmax L] [--despill-hue-end H] <in> <out.png>"
 
-// despill is one named set of despill values.
+// overlap is how far adjacent ViTMatte tiles overlap, in px. A tile must be
+// larger than it, or the tiles never advance across the frame.
+const overlap = 128
+
+// despill is one full set of despill values: matte.py despills only with
+// all five, and has no defaults of its own.
 type despill struct{ hue, clean, chroma, lmax, hueEnd string }
 
 // presets name despill settings measured on a real subject. warm-on-green
@@ -46,11 +51,17 @@ func defaultCoarse() string {
 	return "birefnet"
 }
 
+// isPair reports whether s is A:B with numbers A < B.
 func isPair(s string) bool {
 	a, b, ok := strings.Cut(s, ":")
-	_, e1 := strconv.ParseFloat(a, 64)
-	_, e2 := strconv.ParseFloat(b, 64)
-	return ok && e1 == nil && e2 == nil
+	x, e1 := strconv.ParseFloat(a, 64)
+	y, e2 := strconv.ParseFloat(b, 64)
+	return ok && e1 == nil && e2 == nil && x < y
+}
+
+func isNumber(s string) bool {
+	_, err := strconv.ParseFloat(s, 64)
+	return err == nil
 }
 
 type job struct {
@@ -64,11 +75,11 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fs := cli.Flags("cutout", usage, stderr)
 	coarse := fs.String("coarse", defaultCoarse(), "coarse mask: vision (macOS) or birefnet")
 	height := fs.Int("height", 0, "working height in px, never above the source; at least the largest size the cut-out will be drawn at (0 = source height)")
-	tile := fs.Int("tile", 1024, "ViTMatte tile size in px; 0 runs the whole frame (memory grows with the fourth power of height)")
+	tile := fs.Int("tile", 1024, fmt.Sprintf("ViTMatte tile size in px, above the %d px overlap; 0 runs the whole frame (memory grows with the fourth power of height)", overlap))
 	bin := fs.Int("band-in", 60, "sure foreground: the coarse mask eroded by height/D")
 	bout := fs.Int("band-out", 40, "sure background: beyond the coarse mask dilated by height/D")
-	preset := fs.String("despill", "", "despill preset: warm-on-green")
-	hue := fs.String("despill-hue", "", "contamination ramp in Lab hue degrees, A:B (enables despill)")
+	preset := fs.String("despill", "", "despill preset: warm-on-green; the --despill-* flags override its values")
+	hue := fs.String("despill-hue", "", "contamination ramp in Lab hue degrees, A:B; without a preset, despill needs all five --despill-* flags")
 	clean := fs.String("despill-clean", "", "hue range of clean subject pixels, A:B")
 	chroma := fs.String("despill-chroma", "", "chroma range treated as spill, A:B")
 	lmax := fs.String("despill-lmax", "", "only pixels below this Lab lightness")
@@ -88,6 +99,15 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if j.coarse != "vision" && j.coarse != "birefnet" {
 		return usageErr("--coarse %q: use vision or birefnet", j.coarse)
 	}
+	if j.height < 0 {
+		return usageErr("--height %d: use 0 (the source height) or a positive height", j.height)
+	}
+	if j.tile != 0 && j.tile <= overlap {
+		return usageErr("--tile %d: use 0 (the whole frame) or more than the %d px tile overlap", j.tile, overlap)
+	}
+	if j.bin < 1 || j.bout < 1 {
+		return usageErr("--band-in and --band-out must be at least 1")
+	}
 	if *preset != "" {
 		p, ok := presets[*preset]
 		if !ok {
@@ -95,18 +115,26 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		}
 		j.despill = p
 	}
+	given := 0
 	for _, o := range []struct {
-		v    string
-		dst  *string
-		pair bool
-	}{{*hue, &j.despill.hue, true}, {*clean, &j.despill.clean, true}, {*chroma, &j.despill.chroma, true}, {*lmax, &j.despill.lmax, false}, {*hueEnd, &j.despill.hueEnd, false}} {
+		name, v string
+		dst     *string
+		pair    bool
+	}{{"despill-hue", *hue, &j.despill.hue, true}, {"despill-clean", *clean, &j.despill.clean, true}, {"despill-chroma", *chroma, &j.despill.chroma, true}, {"despill-lmax", *lmax, &j.despill.lmax, false}, {"despill-hue-end", *hueEnd, &j.despill.hueEnd, false}} {
 		if o.v == "" {
 			continue
 		}
 		if o.pair && !isPair(o.v) {
-			return usageErr("%q: want A:B", o.v)
+			return usageErr("--%s %q: want A:B with A < B", o.name, o.v)
+		}
+		if !o.pair && !isNumber(o.v) {
+			return usageErr("--%s %q: want a number", o.name, o.v)
 		}
 		*o.dst = o.v
+		given++
+	}
+	if *preset == "" && given > 0 && given < 5 {
+		return usageErr("despill without --despill needs all five of --despill-hue, --despill-clean, --despill-chroma, --despill-lmax and --despill-hue-end")
 	}
 	if j.coarse == "vision" {
 		if err := vision.Available(runtime.GOOS); err != nil {
@@ -168,14 +196,10 @@ func (j job) run(ctx context.Context) (int, int, error) {
 	args := []string{"--image", frame, "--coarse", mask, "--out", j.out,
 		"--model", pins.ViTMatte.Repo, "--revision", pins.ViTMatte.Revision,
 		"--band-in", strconv.Itoa(j.bin), "--band-out", strconv.Itoa(j.bout),
-		"--tile", strconv.Itoa(j.tile), "--overlap", "128"}
+		"--tile", strconv.Itoa(j.tile), "--overlap", strconv.Itoa(overlap)}
 	if d := j.despill; d.hue != "" {
-		args = append(args, "--despill-hue", d.hue)
-		for _, kv := range [][2]string{{"--despill-clean", d.clean}, {"--despill-chroma", d.chroma}, {"--despill-lmax", d.lmax}, {"--despill-hue-end", d.hueEnd}} {
-			if kv[1] != "" {
-				args = append(args, kv[0], kv[1])
-			}
-		}
+		args = append(args, "--despill-hue", d.hue, "--despill-clean", d.clean, "--despill-chroma", d.chroma,
+			"--despill-lmax", d.lmax, "--despill-hue-end", d.hueEnd)
 	}
 	if _, err := ml.RunScript(ctx, "matte.py", args, []string{frame, mask}, []string{j.out}); err != nil {
 		return 0, 0, err

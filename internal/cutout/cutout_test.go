@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -42,7 +43,9 @@ func png(t *testing.T, fill color.Color) string {
 		}
 	}
 	p := filepath.Join(t.TempDir(), "f.png")
-	raster.SavePNG(p, img)
+	if err := raster.SavePNG(p, img); err != nil {
+		t.Fatal(err)
+	}
 	return p
 }
 
@@ -60,7 +63,9 @@ func setup(t *testing.T) *env {
 	t.Setenv("MATTE_FAIL", "")
 	dir := t.TempDir()
 	e.in, e.out = filepath.Join(dir, "in.jpg"), filepath.Join(dir, "out.png")
-	os.WriteFile(e.in, []byte("jpg"), 0o644)
+	if err := os.WriteFile(e.in, []byte("jpg"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	return e
 }
 
@@ -73,15 +78,99 @@ func TestCutoutBirefnet(t *testing.T) {
 	if code := e.run("--coarse", "birefnet", "--height", "600"); code != 0 {
 		t.Fatalf("code %d: %s", code, e.stderr.String())
 	}
-	calls := enginetest.Calls(t, e.uv)
-	matte := calls[len(calls)-1]
-	for _, want := range []string{"--model", pins.ViTMatte.Repo, "--revision", pins.ViTMatte.Revision, "--tile", "1024", "--band-in", "60", "--band-out", "40"} {
-		if !slices.Contains(matte, want) {
-			t.Errorf("matte args lack %s: %q", want, matte)
+	matte := matteCall(t, e)
+	wantFlags(t, matte, map[string]string{"--model": pins.ViTMatte.Repo, "--revision": pins.ViTMatte.Revision, "--tile": "1024", "--overlap": strconv.Itoa(overlap), "--band-in": "60", "--band-out": "40"})
+	for _, a := range matte {
+		if strings.HasPrefix(a, "--despill") {
+			t.Errorf("despill ran without being asked for: %q", matte)
 		}
 	}
-	if slices.Contains(matte, "--despill-hue") {
-		t.Error("despill ran without being asked for")
+}
+
+// matteCall returns the arguments of the last uv call, the matte script's.
+func matteCall(t *testing.T, e *env) []string {
+	t.Helper()
+	calls := enginetest.Calls(t, e.uv)
+	if len(calls) == 0 {
+		t.Fatal("no uv call")
+	}
+	return calls[len(calls)-1]
+}
+
+// wantFlags checks that each flag is followed by its value.
+func wantFlags(t *testing.T, args []string, want map[string]string) {
+	t.Helper()
+	for k, v := range want {
+		if i := slices.Index(args, k); i < 0 || i+1 >= len(args) || args[i+1] != v {
+			t.Errorf("%s: want %s in %q", k, v, args)
+		}
+	}
+}
+
+func TestWholeFrameTile(t *testing.T) {
+	e := setup(t)
+	if code := e.run("--coarse", "birefnet", "--tile", "0"); code != 0 {
+		t.Fatalf("code %d: %s", code, e.stderr.String())
+	}
+	wantFlags(t, matteCall(t, e), map[string]string{"--tile": "0"})
+}
+
+func TestTileAtOrBelowOverlapRefused(t *testing.T) {
+	for _, tile := range []string{"-1", "100", strconv.Itoa(overlap)} {
+		e := setup(t)
+		if code := e.run("--coarse", "birefnet", "--tile", tile); code != 2 {
+			t.Errorf("--tile %s: code %d", tile, code)
+		}
+		if !strings.Contains(e.stderr.String(), strconv.Itoa(overlap)) {
+			t.Errorf("--tile %s: stderr %q does not name the overlap", tile, e.stderr.String())
+		}
+		if c := enginetest.Calls(t, e.uv); len(c) != 0 {
+			t.Errorf("--tile %s: uv ran: %q", tile, c)
+		}
+	}
+}
+
+func TestCustomDespill(t *testing.T) {
+	e := setup(t)
+	want := map[string]string{"--despill-hue": "60:90", "--despill-clean": "10:50", "--despill-chroma": "5:30", "--despill-lmax": "85", "--despill-hue-end": "190"}
+	args := []string{"--coarse", "birefnet"}
+	for k, v := range want {
+		args = append(args, k, v)
+	}
+	if code := e.run(args...); code != 0 {
+		t.Fatalf("code %d: %s", code, e.stderr.String())
+	}
+	wantFlags(t, matteCall(t, e), want)
+}
+
+func TestPartialCustomDespillRefused(t *testing.T) {
+	for _, args := range [][]string{
+		{"--despill-hue", "60:90"},
+		{"--despill-lmax", "80"},
+		{"--despill-hue", "60:90", "--despill-clean", "10:50", "--despill-chroma", "5:30", "--despill-lmax", "85"},
+	} {
+		e := setup(t)
+		if code := e.run(append([]string{"--coarse", "birefnet"}, args...)...); code != 2 {
+			t.Errorf("%q: code %d", args, code)
+		}
+		if c := enginetest.Calls(t, e.uv); len(c) != 0 {
+			t.Errorf("%q: uv ran: %q", args, c)
+		}
+	}
+}
+
+func TestInvalidValuesRefused(t *testing.T) {
+	for _, args := range [][]string{
+		{"--band-in", "0"}, {"--band-out", "0"}, {"--height", "-1"},
+		{"--despill", "warm-on-green", "--despill-lmax", "x"},
+		{"--despill", "warm-on-green", "--despill-hue-end", "x"},
+		{"--despill", "warm-on-green", "--despill-hue", "100:70"},
+		{"--despill", "warm-on-green", "--despill-clean", "50:50"},
+	} {
+		e := setup(t)
+		if code := e.run(append([]string{"--coarse", "birefnet"}, args...)...); code != 2 {
+			t.Errorf("%q: code %d", args, code)
+		}
 	}
 }
 
@@ -147,14 +236,7 @@ func TestDespillPreset(t *testing.T) {
 	if code := e.run("--coarse", "birefnet", "--despill", "warm-on-green", "--despill-lmax", "80"); code != 0 {
 		t.Fatalf("code %d: %s", code, e.stderr.String())
 	}
-	calls := enginetest.Calls(t, e.uv)
-	m := calls[len(calls)-1]
-	pairs := map[string]string{"--despill-hue": "70:100", "--despill-hue-end": "200", "--despill-chroma": "6:40", "--despill-lmax": "80", "--despill-clean": "15:65"}
-	for k, v := range pairs {
-		if i := slices.Index(m, k); i < 0 || m[i+1] != v {
-			t.Errorf("%s = %q, want %s", k, m, v)
-		}
-	}
+	wantFlags(t, matteCall(t, e), map[string]string{"--despill-hue": "70:100", "--despill-hue-end": "200", "--despill-chroma": "6:40", "--despill-lmax": "80", "--despill-clean": "15:65"})
 }
 
 func TestCutoutUsage(t *testing.T) {
@@ -174,7 +256,9 @@ func TestCutoutUsage(t *testing.T) {
 func TestInputEqualToOutputIsRefused(t *testing.T) {
 	e := setup(t)
 	same := filepath.Join(t.TempDir(), "in.png")
-	os.WriteFile(same, []byte("png"), 0o644)
+	if err := os.WriteFile(same, []byte("png"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	var o, errb bytes.Buffer
 	if code := Main(context.Background(), []string{"--coarse", "birefnet", same, same}, &o, &errb); code != 1 {
 		t.Fatalf("code %d, stderr %q", code, errb.String())

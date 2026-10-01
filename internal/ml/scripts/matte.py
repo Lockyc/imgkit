@@ -78,11 +78,14 @@ def main() -> None:
     ap.add_argument("--tile", type=int, default=1024)
     ap.add_argument("--overlap", type=int, default=128)
     ap.add_argument("--despill-hue", type=pair)
-    ap.add_argument("--despill-hue-end", type=float, default=200.0)
-    ap.add_argument("--despill-chroma", type=pair, default=(6.0, 40.0))
-    ap.add_argument("--despill-lmax", type=float, default=88.0)
-    ap.add_argument("--despill-clean", type=pair, default=(15.0, 65.0))
+    ap.add_argument("--despill-hue-end", type=float)
+    ap.add_argument("--despill-chroma", type=pair)
+    ap.add_argument("--despill-lmax", type=float)
+    ap.add_argument("--despill-clean", type=pair)
     a = ap.parse_args()
+    spill = [a.despill_hue, a.despill_hue_end, a.despill_chroma, a.despill_lmax, a.despill_clean]
+    if any(v is not None for v in spill) and any(v is None for v in spill):
+        ap.error("despill needs all five of --despill-hue, --despill-hue-end, --despill-chroma, --despill-lmax and --despill-clean")
 
     img = Image.open(a.image).convert("RGB")
     coarse = cv2.imread(a.coarse, cv2.IMREAD_GRAYSCALE)
