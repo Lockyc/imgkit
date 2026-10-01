@@ -14,8 +14,10 @@ that survive in the small image and invents no texture.
 
 The model runs on TILE x TILE px tiles, each with PAD px of context on every
 side that is cut away again, and each tile is written straight into an
-8-bit output array. Peak memory is that array (scale^2 x 3-4 bytes per
-source pixel), the model and one tile's activations. Alpha, which the model
+8-bit output array. Peak memory is that array and the PIL image made
+from it (about 7 bytes per output pixel, 11 with alpha), the model and one
+tile's activations: 2.3 GB for a 2000x3000 source enlarged to 8000x12000
+on MPS. Alpha, which the model
 does not take, is enlarged with Lanczos, and dropped when it is opaque
 everywhere.
 """
