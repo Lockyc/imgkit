@@ -68,8 +68,8 @@ func TestRenderPNG(t *testing.T) {
 		t.Errorf("DPI %v, want 192", d)
 	}
 	calls := enginetest.Calls(t, e.chrome)
-	if len(calls) != 1 {
-		t.Fatalf("%d chrome calls, want 1 (no --fail-if, so no DOM dump)", len(calls))
+	if len(calls) != 1 || slices.Contains(calls[0], "--dump-dom") {
+		t.Fatalf("chrome calls %q, want 1 without --dump-dom (no --fail-if)", calls)
 	}
 	for _, want := range []string{"--window-size=100,50", "--force-device-scale-factor=2", "--virtual-time-budget=5000", "--hide-scrollbars", "--allow-file-access-from-files"} {
 		if !slices.Contains(calls[0], want) {
@@ -151,6 +151,9 @@ func TestRenderFailIfDOM(t *testing.T) {
 	}
 	if !strings.Contains(e.stderr.String(), `"could not be read"`) || exists(e.out("p.png")) {
 		t.Errorf("stderr %q", e.stderr.String())
+	}
+	if calls := enginetest.Calls(t, e.chrome); len(calls) != 1 || !slices.Contains(calls[0], "--dump-dom") {
+		t.Errorf("chrome calls %q, want one screenshot that also dumps the DOM", calls)
 	}
 }
 

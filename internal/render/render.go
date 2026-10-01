@@ -205,21 +205,20 @@ func (j job) screenshot(ctx context.Context) error {
 		return fmt.Errorf("render would be %gx%g px (%.1f MP), beyond the %dx%d px verified whole on %s; render smaller or at a lower --scale",
 			fw, fh, fw*fh/1e6, maxSide, maxSide, chrome)
 	}
-	if len(j.failIf) > 0 {
-		res, err := engine.Run(ctx, engine.Cmd{Engine: chrome, Args: append(j.base(), "--dump-dom", j.url), Inputs: j.inputs(), Timeout: 2 * time.Minute})
-		if err != nil {
-			return err
-		}
-		if err := sentinel(string(res.Stdout), j.failIf); err != nil {
-			return err
-		}
-	}
 	pw, ph := int(fw), int(fh)
 	args := append(j.base(),
 		"--force-device-scale-factor="+strconv.FormatFloat(j.scale, 'f', -1, 64),
 		fmt.Sprintf("--window-size=%d,%d", j.w, j.h),
-		"--screenshot="+j.png, j.url)
-	if _, err := engine.Run(ctx, engine.Cmd{Engine: chrome, Args: args, Inputs: j.inputs(), Outputs: []string{j.png}, Timeout: 15 * time.Minute}); err != nil {
+		"--screenshot="+j.png)
+	if len(j.failIf) > 0 {
+		// The DOM comes from the same page load the screenshot shows.
+		args = append(args, "--dump-dom")
+	}
+	res, err := engine.Run(ctx, engine.Cmd{Engine: chrome, Args: append(args, j.url), Inputs: j.inputs(), Outputs: []string{j.png}, Timeout: 15 * time.Minute})
+	if err != nil {
+		return err
+	}
+	if err := sentinel(string(res.Stdout), j.failIf); err != nil {
 		return err
 	}
 	f, err := os.Open(j.png)

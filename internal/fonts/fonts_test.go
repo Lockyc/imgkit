@@ -92,3 +92,16 @@ func TestFontsSameFileAsOutput(t *testing.T) {
 		t.Error("font file was deleted after error")
 	}
 }
+
+func TestFontsFailureRemovesStaleCSS(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "f.css")
+	os.WriteFile(out, []byte("OLD"), 0o644)
+	var o, e bytes.Buffer
+	if code := Main(context.Background(), []string{"-o", out, filepath.Join(dir, "missing.woff2") + ":X:400:normal"}, &o, &e); code != 1 {
+		t.Fatalf("code %d: %s", code, e.String())
+	}
+	if _, err := os.Stat(out); !os.IsNotExist(err) {
+		t.Fatal("a failed run left the earlier CSS in place")
+	}
+}
