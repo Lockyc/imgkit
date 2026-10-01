@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/lockyc/imgkit/internal/doctor"
+	"github.com/lockyc/imgkit/internal/render"
 )
 
 type command struct {
@@ -25,6 +26,7 @@ type command struct {
 var commands = []command{
 	{"version", "print the imgkit version", versionMain},
 	{"doctor", "check every engine; --install fetches the ones imgkit manages", doctor.Main},
+	{"render", "HTML to PNG and/or PDF with headless Chrome", render.Main},
 }
 
 func main() {

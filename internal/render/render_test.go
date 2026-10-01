@@ -1,0 +1,230 @@
+package render
+
+import (
+	"bytes"
+	"context"
+	"image"
+	"image/png"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/lockyc/imgkit/internal/enginetest"
+	"github.com/lockyc/imgkit/internal/raster"
+)
+
+const chromeStub = `for a in "$@"; do
+  case "$a" in
+    --screenshot=*) [ -n "$FIXTURE_PNG" ] && cp "$FIXTURE_PNG" "${a#--screenshot=}" ;;
+    --print-to-pdf=*) printf '%%PDF-1.4 stub' > "${a#--print-to-pdf=}" ;;
+    --dump-dom) printf '%s' "$FIXTURE_DOM" ;;
+  esac
+done
+exit ${CHROME_EXIT:-0}`
+
+func fixturePNG(t *testing.T, w, h int) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "fixture.png")
+	f, _ := os.Create(p)
+	png.Encode(f, image.NewRGBA(image.Rect(0, 0, w, h)))
+	f.Close()
+	return p
+}
+
+type env struct {
+	chrome, dir, page string
+	stdout, stderr    bytes.Buffer
+}
+
+func setup(t *testing.T, fixW, fixH int) *env {
+	t.Helper()
+	e := &env{chrome: enginetest.Stub(t, "chrome-headless-shell", chromeStub), dir: t.TempDir()}
+	t.Setenv("FIXTURE_PNG", fixturePNG(t, fixW, fixH))
+	t.Setenv("FIXTURE_DOM", "<html><body>fine</body></html>")
+	t.Setenv("CHROME_EXIT", "0")
+	e.page = filepath.Join(e.dir, "page.html")
+	os.WriteFile(e.page, []byte("<html></html>"), 0o644)
+	enginetest.Stub(t, "pdfinfo", `printf 'Pages: 1\nPage size: %s\n' "${PDF_BOX:-900 x 675 pts}"`)
+	enginetest.Stub(t, "pdftotext", `printf '%s' "$PDF_TEXT"`)
+	return e
+}
+
+func (e *env) run(args ...string) int {
+	return Main(context.Background(), args, &e.stdout, &e.stderr)
+}
+
+func (e *env) out(name string) string { return filepath.Join(e.dir, name) }
+
+func exists(p string) bool { _, err := os.Stat(p); return err == nil }
+
+func TestRenderPNG(t *testing.T) {
+	e := setup(t, 200, 100)
+	if code := e.run("--size", "100x50", "--scale", "2", "--png", e.out("p.png"), e.page); code != 0 {
+		t.Fatalf("code %d: %s", code, e.stderr.String())
+	}
+	if d, _ := raster.DPI(e.out("p.png")); d < 191.99 || d > 192.01 {
+		t.Errorf("DPI %v, want 192", d)
+	}
+	calls := enginetest.Calls(t, e.chrome)
+	if len(calls) != 1 {
+		t.Fatalf("%d chrome calls, want 1 (no --fail-if, so no DOM dump)", len(calls))
+	}
+	for _, want := range []string{"--window-size=100,50", "--force-device-scale-factor=2", "--virtual-time-budget=5000", "--hide-scrollbars", "--allow-file-access-from-files"} {
+		if !slices.Contains(calls[0], want) {
+			t.Errorf("chrome args lack %s: %q", want, calls[0])
+		}
+	}
+	for _, a := range calls[0] {
+		if strings.HasPrefix(a, "--user-data-dir") {
+			t.Error("--user-data-dir passed; headless Chrome hangs after the shot with it")
+		}
+	}
+}
+
+func TestRenderFractionalScale(t *testing.T) {
+	e := setup(t, 1200, 150)
+	if code := e.run("--size", "800x100", "--scale", "1.5", "--png", e.out("p.png"), e.page); code != 0 {
+		t.Fatalf("code %d: %s", code, e.stderr.String())
+	}
+	if d, _ := raster.DPI(e.out("p.png")); d < 143.99 || d > 144.01 {
+		t.Errorf("DPI %v, want 144", d)
+	}
+}
+
+func TestRenderRefusesBeyondVerified(t *testing.T) {
+	e := setup(t, 1, 1)
+	stale := e.out("p.png")
+	os.WriteFile(stale, []byte("stale"), 0o644)
+	if code := e.run("--size", "8200x8200", "--scale", "2", "--png", stale, e.page); code != 1 {
+		t.Fatalf("code %d", code)
+	}
+	if !strings.Contains(e.stderr.String(), "MP") {
+		t.Errorf("stderr %q", e.stderr.String())
+	}
+	if exists(stale) {
+		t.Error("stale output survived a refused render")
+	}
+	if len(enginetest.Calls(t, e.chrome)) != 0 {
+		t.Error("chrome ran for a refused render")
+	}
+}
+
+func TestRenderWrongSizeFails(t *testing.T) {
+	e := setup(t, 100, 100)
+	if code := e.run("--size", "100x50", "--scale", "2", "--png", e.out("p.png"), e.page); code != 1 {
+		t.Fatalf("code %d", code)
+	}
+	if !strings.Contains(e.stderr.String(), "rendered 100x100, expected 200x100") || exists(e.out("p.png")) {
+		t.Errorf("stderr %q, file left: %v", e.stderr.String(), exists(e.out("p.png")))
+	}
+}
+
+func TestRenderKilledChromeLeavesNothing(t *testing.T) {
+	e := setup(t, 200, 100)
+	t.Setenv("CHROME_EXIT", "144")
+	if code := e.run("--size", "100x50", "--scale", "2", "--png", e.out("p.png"), e.page); code != 1 {
+		t.Fatalf("code %d", code)
+	}
+	if exists(e.out("p.png")) {
+		t.Error("output of a killed Chrome survived")
+	}
+}
+
+func TestRenderNoOutput(t *testing.T) {
+	e := setup(t, 200, 100)
+	t.Setenv("FIXTURE_PNG", "")
+	if code := e.run("--size", "100x50", "--scale", "2", "--png", e.out("p.png"), e.page); code != 1 {
+		t.Fatalf("code %d", code)
+	}
+	if !strings.Contains(e.stderr.String(), "produced no output") {
+		t.Errorf("stderr %q", e.stderr.String())
+	}
+}
+
+func TestRenderFailIfDOM(t *testing.T) {
+	e := setup(t, 200, 100)
+	t.Setenv("FIXTURE_DOM", `<p data-source-error>could not be read</p>`)
+	if code := e.run("--size", "100x50", "--scale", "2", "--fail-if", "could not be read", "--png", e.out("p.png"), e.page); code != 1 {
+		t.Fatalf("code %d", code)
+	}
+	if !strings.Contains(e.stderr.String(), `"could not be read"`) || exists(e.out("p.png")) {
+		t.Errorf("stderr %q", e.stderr.String())
+	}
+}
+
+func TestRenderPDF(t *testing.T) {
+	e := setup(t, 1, 1)
+	if code := e.run("--size", "1200x900", "--pdf", e.out("p.pdf"), e.page); code != 0 {
+		t.Fatalf("code %d: %s", code, e.stderr.String())
+	}
+	if !slices.Contains(enginetest.Calls(t, e.chrome)[0], "--no-pdf-header-footer") {
+		t.Error("PDF printed with header and footer")
+	}
+}
+
+func TestRenderPDFPageMismatch(t *testing.T) {
+	e := setup(t, 1, 1)
+	t.Setenv("PDF_BOX", "612 x 792 pts (letter)")
+	if code := e.run("--size", "1200x900", "--pdf", e.out("p.pdf"), e.page); code != 1 {
+		t.Fatalf("code %d", code)
+	}
+	if !strings.Contains(e.stderr.String(), "@page") || exists(e.out("p.pdf")) {
+		t.Errorf("stderr %q", e.stderr.String())
+	}
+}
+
+func TestRenderPDFFailIf(t *testing.T) {
+	e := setup(t, 1, 1)
+	t.Setenv("PDF_TEXT", "Lot 4 nothing matches")
+	if code := e.run("--fail-if", "nothing matches", "--pdf", e.out("p.pdf"), e.page); code != 1 {
+		t.Fatalf("code %d", code)
+	}
+	if exists(e.out("p.pdf")) {
+		t.Error("sentinel PDF survived")
+	}
+}
+
+func TestRenderPDFWarnsOffGrid(t *testing.T) {
+	e := setup(t, 1, 1)
+	t.Setenv("PDF_BOX", "903 x 675 pts")
+	e.run("--size", "1204x900", "--pdf", e.out("p.pdf"), e.page)
+	if !strings.Contains(e.stderr.String(), "multiples of 8") {
+		t.Errorf("no warning: %q", e.stderr.String())
+	}
+}
+
+func TestRenderUsage(t *testing.T) {
+	e := setup(t, 1, 1)
+	for _, args := range [][]string{
+		{e.page},
+		{"--png", e.out("p.png"), e.page},
+		{"--size", "0x5", "--png", e.out("p.png"), e.page},
+		{"--size", "100x50", "--scale", "0", "--png", e.out("p.png"), e.page},
+	} {
+		if code := e.run(args...); code != 2 {
+			t.Errorf("%q: code %d, want 2", args, code)
+		}
+	}
+}
+
+func TestPageURLEscapes(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "a b#c%d")
+	os.MkdirAll(dir, 0o755)
+	p := filepath.Join(dir, "page.html")
+	os.WriteFile(p, nil, 0o644)
+	got, err := pageURL(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(got, "file:///") || !strings.Contains(got, "a%20b%23c%25d/page.html") {
+		t.Errorf("pageURL = %q", got)
+	}
+	if u, _ := pageURL("https://example.org/x"); u != "https://example.org/x" {
+		t.Errorf("https URL rewritten to %q", u)
+	}
+	if _, err := pageURL(filepath.Join(t.TempDir(), "missing.html")); err == nil {
+		t.Error("missing page accepted")
+	}
+}
