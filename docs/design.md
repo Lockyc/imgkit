@@ -93,15 +93,16 @@ colours, or renders what it is given.
   `--fail-if` string: dumped DOM for PNG, `pdftotext` for PDF.
 - **press** — Ghostscript pdfwrite with outlined text, CMYK conversion to a
   supplied ICC, fixed media from the input's page box, and images downsampled
-  only above `--max-ppi`. It then checks the result has no fonts, no RGB, and
-  unchanged page boxes, and compares a soft proof against the source by RMSE
-  over the page and any `--proof-region`.
+  only above 1.5 × `--max-ppi`. It then checks the result has no fonts, no
+  RGB, and unchanged page boxes, and compares a soft proof against the source
+  by RMSE over the page and any `--region`.
 - **grade** — `fit` registers the image to the reference (SIFT + RANSAC),
   fits an RGB→RGB thin-plate map on opaque, eroded pixels, and bakes a 16-bit
   HALD CLUT. `apply` runs the CLUT through ImageMagick and restores alpha,
   which `-hald-clut` drops.
 - **diff** — crops both images to their overlap, searches a vertical shift,
-  and scores the share of pixels outside a per-channel tolerance.
+  and scores the share of pixels whose per-channel difference has a luma above
+  the tolerance.
 - **infill, inpaint, upscale, fonts, qr** — as the README table describes.
 
 ## Platforms and errors
