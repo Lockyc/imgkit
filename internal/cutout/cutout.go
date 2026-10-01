@@ -166,7 +166,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return usageErr("despill without --despill needs all five of --despill-hue, --despill-clean, --despill-chroma, --despill-lmax and --despill-hue-end")
 	}
 	if j.coarse == "vision" {
-		if err := vision.Available(runtime.GOOS); err != nil {
+		if err := vision.Available(); err != nil {
 			return cli.Fail(stderr, "cutout", err)
 		}
 	}

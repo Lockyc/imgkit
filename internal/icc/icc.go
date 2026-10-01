@@ -28,9 +28,21 @@ func SRGB() (string, error) {
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return "", err
 	}
-	tmp := p + ".tmp"
-	if err := os.WriteFile(tmp, srgb, 0o644); err != nil {
+	// A temp file of its own, so concurrent runs never write one file.
+	f, err := os.CreateTemp(filepath.Dir(p), ".sRGB-*")
+	if err != nil {
 		return "", err
 	}
-	return p, os.Rename(tmp, p)
+	defer os.Remove(f.Name())
+	_, err = f.Write(srgb)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Chmod(f.Name(), 0o644)
+	}
+	if err != nil {
+		return "", err
+	}
+	return p, os.Rename(f.Name(), p)
 }

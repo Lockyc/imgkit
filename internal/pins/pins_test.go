@@ -93,8 +93,10 @@ func TestHint(t *testing.T) {
 }
 
 func TestMLPins(t *testing.T) {
-	if !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(ViTMatte.Revision) {
-		t.Errorf("ViTMatte revision %q is not a commit sha", ViTMatte.Revision)
+	for name, m := range map[string]Model{"ViTMatte": ViTMatte, "DAT": DAT} {
+		if !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(m.Revision) {
+			t.Errorf("%s revision %q is not a commit sha", name, m.Revision)
+		}
 	}
 	if IOPaint.Version == "" || IOPaint.ExcludeNewer == "" {
 		t.Error("IOPaint needs a version and an exclude-newer date")

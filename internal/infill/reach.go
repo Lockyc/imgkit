@@ -301,12 +301,16 @@ func (p *puller) pullsAtLeast(part []int, box image.Rectangle, least float64) bo
 		return false
 	}
 	// Past the window's edges the part's blur is zero, or the holes lie a
-	// full support inside them, so the window blurs exactly as the crop would.
+	// full support inside them, so the window blurs exactly as the crop
+	// would, and a part pixel outside it, more than a support from every
+	// hole, adds nothing there.
 	win := box.Inset(-p.reach).Intersect(p.holes.Inset(-p.reach)).Intersect(image.Rect(0, 0, p.w, p.h))
 	ww, wh := win.Dx(), win.Dy()
 	ind := make([]float32, ww*wh)
 	for _, i := range part {
-		ind[(i/p.w-win.Min.Y)*ww+i%p.w-win.Min.X] = 1
+		if pt := image.Pt(i%p.w, i/p.w); pt.In(win) {
+			ind[(pt.Y-win.Min.Y)*ww+pt.X-win.Min.X] = 1
+		}
 	}
 	pw := blur(ind, ww, wh, p.coarse)
 	at := win.Intersect(p.holes)

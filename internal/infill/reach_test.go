@@ -1,6 +1,7 @@
 package infill
 
 import (
+	"image"
 	"image/color"
 	"math"
 	"path/filepath"
@@ -289,5 +290,45 @@ func TestEdgeStopsKeepPaceOnAPatternedPage(t *testing.T) {
 	}
 	if d := time.Since(start); d > 15*time.Second {
 		t.Errorf("edge stops took %v on a patterned page, want under 15s", d)
+	}
+}
+
+// TestPullsAtLeastSkipsPixelsBeyondTheWindow: a part reaching well past the
+// window around the holes is judged as a whole-frame blur would judge it,
+// whatever crop the caller made.
+func TestPullsAtLeastSkipsPixelsBeyondTheWindow(t *testing.T) {
+	const w, h, coarse = 200, 200, 4.0
+	known := make([]bool, w*h)
+	wt := make([]float32, w*h)
+	for i := range known {
+		x, y := i%w, i/w
+		known[i] = x < 98 || x >= 102 || y < 98 || y >= 102
+		if known[i] {
+			wt[i] = 1
+		}
+	}
+	p := newPuller(known, wt, w, h, coarse)
+	// One row just below the hole, across the whole frame.
+	var part []int
+	for x := 0; x < w; x++ {
+		part = append(part, 103*w+x)
+	}
+	box := image.Rect(0, 103, w, 104)
+	ind := make([]float32, w*h)
+	for _, i := range part {
+		ind[i] = 1
+	}
+	pw := blur(ind, w, h, coarse)
+	var most float64
+	for i, k := range known {
+		if !k && p.knownW[i] > 1e-6 {
+			most = math.Max(most, float64(pw[i]/p.knownW[i]))
+		}
+	}
+	if most == 0 {
+		t.Fatal("the row does not pull on the hole")
+	}
+	if !p.pullsAtLeast(part, box, most*0.99) || p.pullsAtLeast(part, box, most*1.01) {
+		t.Errorf("pull judged unlike the whole-frame blur's %.4f", most)
 	}
 }
