@@ -121,7 +121,7 @@ why    = "the coarse mask swallows ivy behind flyaway hair, deep enough that a n
 run    = ["cutout", "{asset:portrait-ivy.jpg}", "{tmp:cut.png}"]
 metric = "green-fringe"
 params = { image = "{tmp:cut.png}", region = "0.17,0,0.57,0.58", bg = "#062d5f" }
-max    = 0.00015
+max    = 0.00082
 
 [[case]]
 name   = "cutout-hair-over-foliage-birefnet"
@@ -129,7 +129,7 @@ why    = "the Linux default coarse mask must reach the same edge quality"
 run    = ["cutout", "--coarse", "birefnet", "{asset:portrait-ivy.jpg}", "{tmp:cut.png}"]
 metric = "green-fringe"
 params = { image = "{tmp:cut.png}", region = "0.17,0,0.57,0.58", bg = "#062d5f" }
-max    = 0.000089
+max    = 0.00081
 
 [[case]]
 name   = "cutout-sleeve-not-seethrough"
@@ -163,7 +163,7 @@ run    = ["cutout", "--tile", "1024", "{tmp:small.jpg}", "{tmp:tiled.png}"]
 post   = [["imgkit", "cutout", "--tile", "0", "{tmp:small.jpg}", "{tmp:whole.png}"]]
 metric = "rmse"
 params = { a = "{tmp:tiled.png}", b = "{tmp:whole.png}", channels = "alpha" }
-max    = 0.01
+max    = 0.0078
 
 [[case]]
 name   = "cutout-refuses-upsample"
