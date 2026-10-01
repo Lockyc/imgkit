@@ -210,11 +210,31 @@ func TestIntelMacBlockers(t *testing.T) {
 	}
 }
 
+// TestIntelMac: an amd64 imgkit under Rosetta runs on Apple Silicon, where
+// uv installs the arm64 wheels, so only an untranslated one is an Intel Mac.
+func TestIntelMac(t *testing.T) {
+	for _, c := range []struct {
+		platform, translated string
+		want                 bool
+	}{
+		{"darwin/amd64", "0", true},
+		{"darwin/amd64", "", true},
+		{"darwin/amd64", "1", false},
+		{"darwin/arm64", "0", false},
+		{"linux/amd64", "0", false},
+	} {
+		if got := intelMac(c.platform, c.translated); got != c.want {
+			t.Errorf("intelMac(%q, %q) = %v, want %v", c.platform, c.translated, got, c.want)
+		}
+	}
+}
+
 func TestRunScriptRefusesWhatCannotInstall(t *testing.T) {
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	log := enginetest.Stub(t, "uv", `exit 0`)
-	defer func(p string) { platform = p }(platform)
+	defer func(p string, f func() string) { platform, procTranslated = p, f }(platform, procTranslated)
 	platform = "darwin/amd64"
+	procTranslated = func() string { return "0" }
 	_, err := RunScript(context.Background(), "upscale.py", nil, nil, nil)
 	if err == nil || !strings.Contains(err.Error(), "torch") || !strings.Contains(err.Error(), "Apple Silicon or Linux") {
 		t.Errorf("upscale.py on an Intel Mac: %v", err)
@@ -225,7 +245,12 @@ func TestRunScriptRefusesWhatCannotInstall(t *testing.T) {
 	if _, err := RunScript(context.Background(), "gradefit.py", nil, nil, nil); err != nil {
 		t.Errorf("gradefit.py on an Intel Mac: %v", err)
 	}
+	procTranslated = func() string { return "1" }
+	if _, err := RunScript(context.Background(), "upscale.py", nil, nil, nil); err != nil {
+		t.Errorf("upscale.py under Rosetta: %v", err)
+	}
 	platform = "darwin/arm64"
+	procTranslated = func() string { return "0" }
 	if _, err := RunScript(context.Background(), "upscale.py", nil, nil, nil); err != nil {
 		t.Errorf("upscale.py on Apple Silicon: %v", err)
 	}

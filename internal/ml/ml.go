@@ -114,8 +114,19 @@ func ToolDevice(ctx context.Context, t pins.PyTool) (string, error) {
 	return d, nil
 }
 
-// platform is GOOS/GOARCH, a variable so tests can stand in another.
-var platform = runtime.GOOS + "/" + runtime.GOARCH
+// platform is GOOS/GOARCH, and procTranslated reports Rosetta; variables
+// so tests can stand in another machine.
+var (
+	platform       = runtime.GOOS + "/" + runtime.GOARCH
+	procTranslated = translated
+)
+
+// intelMac reports an Intel Mac: an amd64 build on macOS that Rosetta is not
+// translating. Under Rosetta the machine is Apple Silicon, and uv installs
+// the arm64 wheels.
+func intelMac(platform, translated string) bool {
+	return platform == "darwin/amd64" && translated != "1"
+}
 
 // intelMacBlockers names the packages in a script's lockfile that uv cannot
 // install on an Intel Mac: built for macOS, but only for Apple Silicon, and
@@ -156,7 +167,7 @@ func RunScript(ctx context.Context, name string, args, inputs, outputs []string)
 	if err != nil {
 		return engine.Result{}, err
 	}
-	if platform == "darwin/amd64" {
+	if intelMac(platform, procTranslated()) {
 		lock, _ := scripts.ReadFile("scripts/" + name + ".lock") // Script has read it
 		blocked, err := intelMacBlockers(lock)
 		if err != nil {
