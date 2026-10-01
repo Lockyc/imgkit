@@ -129,9 +129,14 @@ colours, or renders what it is given.
 
 ## Platforms and errors
 
-macOS is primary. On Linux, everything works except `--coarse vision`, which
-exits with a message pointing at `birefnet`. No command depends on GNU-only
-flags. An operation that cannot do the job fails with the measured reason
+macOS is primary. The floor is the locked wheels': Apple Silicon on macOS 14
+or later, and Linux with glibc 2.28 or later on x86_64 or arm64. On Linux,
+everything works except `--coarse vision`, which exits with a message pointing
+at `birefnet`. On an Intel Mac, `ml.RunScript` refuses a script whose
+lockfile holds a package built for Apple Silicon only (PyTorch, ONNX
+Runtime), so `cutout` and `upscale` refuse before uv runs; `grade fit` needs
+macOS 14 or later there, and `inpaint`, whose iopaint resolves its own
+older PyTorch there, is untested. No command depends on GNU-only flags. An operation that cannot do the job fails with the measured reason
 ("no foreground found", "render would be 61.7 MP"), and never leaves a
 plausible-looking wrong file behind.
 

@@ -38,7 +38,14 @@ this puts `synthesis = "forbid"` in an `imgkit.toml`, and they refuse to run.
 
 ```bash
 go install github.com/lockyc/imgkit@latest
+imgkit doctor   # checks each engine and prints the command to install any that are missing
 ```
+
+Runs on macOS 14 or later on Apple Silicon, and on Linux with glibc 2.28 or
+later (x86_64 or arm64). On an Intel Mac, `cutout` and `upscale` refuse to
+run, because PyTorch and ONNX Runtime publish no build for it, and `grade fit`
+needs macOS 14 or later. The ML commands run on the GPU when PyTorch finds
+one; `IMGKIT_DEVICE=cpu` (or `mps`, `cuda`) chooses the device instead.
 
 ## Development
 

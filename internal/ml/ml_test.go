@@ -191,3 +191,42 @@ func TestDeviceRule(t *testing.T) {
 		t.Errorf("IMGKIT_DEVICE=tpu accepted: %v", err)
 	}
 }
+
+func TestIntelMacBlockers(t *testing.T) {
+	for name, want := range map[string][]string{
+		"matte.py":    {"torch", "torchvision"},
+		"upscale.py":  {"torch", "torchvision"},
+		"birefnet.py": {"onnxruntime"},
+		"gradefit.py": nil,
+	} {
+		lock, err := scripts.ReadFile("scripts/" + name + ".lock")
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := intelMacBlockers(lock)
+		if err != nil || !slices.Equal(got, want) {
+			t.Errorf("%s: %q, %v; want %q", name, got, err, want)
+		}
+	}
+}
+
+func TestRunScriptRefusesWhatCannotInstall(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	log := enginetest.Stub(t, "uv", `exit 0`)
+	defer func(p string) { platform = p }(platform)
+	platform = "darwin/amd64"
+	_, err := RunScript(context.Background(), "upscale.py", nil, nil, nil)
+	if err == nil || !strings.Contains(err.Error(), "torch") || !strings.Contains(err.Error(), "Apple Silicon or Linux") {
+		t.Errorf("upscale.py on an Intel Mac: %v", err)
+	}
+	if c := enginetest.Calls(t, log); len(c) != 0 {
+		t.Errorf("uv ran: %q", c)
+	}
+	if _, err := RunScript(context.Background(), "gradefit.py", nil, nil, nil); err != nil {
+		t.Errorf("gradefit.py on an Intel Mac: %v", err)
+	}
+	platform = "darwin/arm64"
+	if _, err := RunScript(context.Background(), "upscale.py", nil, nil, nil); err != nil {
+		t.Errorf("upscale.py on Apple Silicon: %v", err)
+	}
+}

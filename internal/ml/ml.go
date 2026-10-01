@@ -15,10 +15,13 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/lockyc/imgkit/internal/engine"
 	"github.com/lockyc/imgkit/internal/pins"
 )
@@ -111,11 +114,57 @@ func ToolDevice(ctx context.Context, t pins.PyTool) (string, error) {
 	return d, nil
 }
 
-// RunScript runs an embedded script with uv, locked to its lockfile.
+// platform is GOOS/GOARCH, a variable so tests can stand in another.
+var platform = runtime.GOOS + "/" + runtime.GOARCH
+
+// intelMacBlockers names the packages in a script's lockfile that uv cannot
+// install on an Intel Mac: built for macOS, but only for Apple Silicon, and
+// with no source distribution to build from. PyTorch and ONNX Runtime
+// publish no macOS x86_64 wheels.
+func intelMacBlockers(lock []byte) ([]string, error) {
+	var l struct {
+		Package []struct {
+			Name   string
+			Sdist  map[string]any
+			Wheels []struct{ URL string }
+		}
+	}
+	if err := toml.Unmarshal(lock, &l); err != nil {
+		return nil, err
+	}
+	var blocked []string
+	for _, p := range l.Package {
+		mac, intel := false, false
+		for _, w := range p.Wheels {
+			mac = mac || strings.Contains(w.URL, "-macosx_")
+			intel = intel || strings.HasSuffix(w.URL, "-none-any.whl") || intelWheel.MatchString(w.URL)
+		}
+		if mac && !intel && p.Sdist == nil {
+			blocked = append(blocked, p.Name)
+		}
+	}
+	return blocked, nil
+}
+
+var intelWheel = regexp.MustCompile(`-macosx_[0-9_]+_(x86_64|universal2|intel)\.whl$`)
+
+// RunScript runs an embedded script with uv, locked to its lockfile. On an
+// Intel Mac it first refuses a script whose lockfile uv cannot install
+// there, rather than let uv fail on resolution.
 func RunScript(ctx context.Context, name string, args, inputs, outputs []string) (engine.Result, error) {
 	p, err := Script(name)
 	if err != nil {
 		return engine.Result{}, err
+	}
+	if platform == "darwin/amd64" {
+		lock, _ := scripts.ReadFile("scripts/" + name + ".lock") // Script has read it
+		blocked, err := intelMacBlockers(lock)
+		if err != nil {
+			return engine.Result{}, fmt.Errorf("%s.lock: %w", name, err)
+		}
+		if len(blocked) > 0 {
+			return engine.Result{}, fmt.Errorf("%s needs %s, which publish no Intel-Mac (macOS x86_64) build; run it on Apple Silicon or Linux", name, strings.Join(blocked, " and "))
+		}
 	}
 	return engine.Run(ctx, engine.Cmd{Engine: "uv", Args: append([]string{"run", "--locked", "--script", p}, args...), Inputs: inputs, Outputs: outputs, Timeout: Timeout})
 }
