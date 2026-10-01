@@ -44,8 +44,9 @@ imgkit doctor   # checks each engine and prints the command to install any that 
 Runs on macOS 14 or later on Apple Silicon, and on Linux with glibc 2.28 or
 later (x86_64 or arm64). On an Intel Mac, `cutout` and `upscale` refuse to
 run, because PyTorch and ONNX Runtime publish no build for it, and `grade fit`
-needs macOS 14 or later. The ML commands run on the GPU when PyTorch finds
-one; `IMGKIT_DEVICE=cpu` (or `mps`, `cuda`) chooses the device instead.
+needs macOS 14 or later. ViTMatte and DAT run on the GPU when PyTorch finds
+one; BiRefNet runs on the CPU, and so does LaMa on a Mac. `IMGKIT_DEVICE=cpu`
+(or `mps`, `cuda`) chooses the PyTorch device instead.
 
 ## Development
 
