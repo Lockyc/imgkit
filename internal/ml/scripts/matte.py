@@ -186,7 +186,13 @@ def matte_tiled(img, trimap, processor, model, device, tile, overlap):
                 acc[y : y + th, x : x + tw] += (t.astype(np.float32) / 255.0) * win
                 weight[y : y + th, x : x + tw] += win
                 continue
-            inputs = processor(images=Image.fromarray(img_np[y : y + th, x : x + tw]), trimaps=Image.fromarray(t), return_tensors="pt").to(device)
+            # The processor pads to a multiple of 32 with zeros, which reads
+            # as a dark strip of sure background and skews the alpha along
+            # the frame's bottom and right edges. Mirror the content instead.
+            ph, pw = -th % 32, -tw % 32
+            ti = cv2.copyMakeBorder(np.ascontiguousarray(img_np[y : y + th, x : x + tw]), 0, ph, 0, pw, cv2.BORDER_REFLECT_101)
+            tt = cv2.copyMakeBorder(np.ascontiguousarray(t), 0, ph, 0, pw, cv2.BORDER_REFLECT_101)
+            inputs = processor(images=Image.fromarray(ti), trimaps=Image.fromarray(tt), return_tensors="pt").to(device)
             with torch.no_grad():
                 al = model(**inputs).alphas[0, 0].float().cpu().numpy()[:th, :tw]
             acc[y : y + th, x : x + tw] += np.clip(al, 0.0, 1.0) * win
