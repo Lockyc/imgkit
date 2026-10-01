@@ -189,7 +189,8 @@ func hexColour(s string) ([3]float64, error) {
 }
 
 // greenFringe composites the cut-out over bg (premultiplied colour + (1-a)·bg)
-// and counts green-dominant pixels among those with any coverage.
+// and counts green-dominant pixels among those above 2% coverage, as a share
+// of every pixel in the region.
 func greenFringe(p Params) (float64, error) {
 	path, err := p.Path("image")
 	if err != nil {

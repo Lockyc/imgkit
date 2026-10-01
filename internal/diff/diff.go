@@ -131,7 +131,7 @@ func picture(b *image.RGBA64, mask *image.Gray, rows image.Rectangle) *image.RGB
 // Exit 1: over it. Exit 2: could not compare.
 func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fs := cli.Flags("diff", usage, stderr)
-	tol := fs.Uint("tolerance", 28, "per-pixel luma difference, 0-255, below which pixels count as equal")
+	tol := fs.Uint("tolerance", 28, "per-pixel luma difference, 0-255, at or below which pixels count as equal")
 	maxShift := fs.Int("max-shift", 60, "px of vertical misalignment to search")
 	step := fs.Int("step", 2, "search granularity in px")
 	threshold := fs.Float64("threshold", 0, "exit 1 when more than this percent of pixels differ")

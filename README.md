@@ -14,7 +14,7 @@ against a committed set of test images rather than judged by eye.
 
 ## Status
 
-v0.1.0: every command below works on Apple Silicon Macs and on Linux, with
+Every command below works on Apple Silicon Macs and on Linux, with
 the exceptions listed under [Platforms](#platforms). What comes next is in
 [docs/roadmap.md](docs/roadmap.md), and how it is built is in
 [docs/design.md](docs/design.md).
@@ -27,7 +27,7 @@ the exceptions listed under [Platforms](#platforms). What comes next is in
 | `upscale` ⚠ | Enlarges 4× with DAT, a super-resolution model that sharpens what the small image holds rather than inventing texture | `imgkit upscale <in> <out.png>` |
 | `grade fit` | Recovers a reference image's colour grade as a lookup table | `imgkit grade fit --ref ref.png [--ref-crop x,y,w,h] [--exclude x,y,w,h]... [--level 8] [--min-inliers 40] <subject.png> <out-hald.png>` |
 | `grade apply` | Applies that lookup table, keeping transparency | `imgkit grade apply --clut hald.png <in> <out.png>` |
-| `render` | HTML to PNG or PDF with headless Chrome, guarded against Chrome's silent failures | `imgkit render [--png out.png] [--pdf out.pdf] [--size WxH] [--scale S] [--budget MS] [--fail-if TEXT]... <page.html\|URL>` |
+| `render` | HTML to PNG or PDF with headless Chrome, guarded against Chrome's silent failures | `imgkit render [--png out.png] [--pdf out.pdf] [--size WxH] [--scale S] [--budget MS] [--fail-if TEXT]... <page.html\|http(s) or file URL>` |
 | `press` | Converts a PDF to a print master (text as outlines, CMYK colour) and checks it against a soft proof | `imgkit press --icc profile.icc [--max-ppi N] [--max-rmse R] [--region x,y,w,h:max]... [--proof-width PX] <in.pdf> <out.pdf>` |
 | `diff` | Compares two images after lining them up, so a small shift doesn't fail everything | `imgkit diff [--tolerance N] [--max-shift PX] [--step PX] [--threshold PCT] [--out diff.png] <a> <b>` |
 | `fonts` | Embeds web fonts into a CSS file so a page renders from the filesystem | `imgkit fonts [--display block] -o fonts.css FILE:FAMILY:WEIGHT:STYLE...` |
@@ -36,6 +36,9 @@ the exceptions listed under [Platforms](#platforms). What comes next is in
 | `version` | Prints imgkit's version | `imgkit version` |
 
 `imgkit <command> -h` lists each flag with its default.
+
+`render` runs the page outside Chrome's sandbox, with read access to your
+files and open network access: give it only pages you trust.
 
 ⚠ These commands create pixels the source never had. A project that forbids
 this puts `synthesis = "forbid"` in an `imgkit.toml`, and they refuse to run.

@@ -24,7 +24,9 @@ jobs:
           fi
 
       - name: go vet
-        run: go vet ./...
+        run: |
+          go vet ./...
+          go vet -tags quality ./quality/
 
       - name: go test
         run: go test ./...

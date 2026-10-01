@@ -28,6 +28,7 @@ internal/engine/     the one way an external tool is run
 internal/frame/      the source pre-pass the ML ops read: oriented, sRGB, 8-bit
                      RGB(A) PNG; or oriented only, for infill
 internal/icc/        the embedded sRGB profile
+internal/imgsize/    image dimensions without decoding pixels
 internal/enginetest/ sh stubs that stand in for engines in tests
 internal/pins/       the one table of engine versions
 internal/pdf/        PDF page count, page boxes and text through poppler
@@ -139,7 +140,7 @@ ONNX Runtime), so `cutout` and `upscale` refuse before uv runs; `grade fit`
 needs macOS 14 or later there, and `inpaint`, whose iopaint resolves its own
 older PyTorch there, is untested. No command depends on GNU-only flags. An
 operation that cannot do the job fails with the measured reason ("no
-foreground found", "render would be 61.7 MP"), and never leaves a
+foreground found", "render would be … px, beyond the … px verified whole"), and never leaves a
 plausible-looking wrong file behind.
 
 ## Quality
