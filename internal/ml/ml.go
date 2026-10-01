@@ -8,16 +8,11 @@ package ml
 
 import (
 	"context"
-	"crypto/sha256"
 	"embed"
-	"encoding/hex"
 	"fmt"
-	"maps"
-	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"slices"
 	"strings"
 	"time"
 
@@ -39,45 +34,6 @@ const deviceModule = "imgkit_device.py"
 //go:embed imgkit_device.py
 var deviceRule []byte
 
-// cached writes files into a cache directory named by a hash of their names
-// and contents, so a new imgkit never runs a file an older one left behind,
-// and returns the directory.
-func cached(files map[string][]byte) (string, error) {
-	names := slices.Sorted(maps.Keys(files))
-	h := sha256.New()
-	for _, n := range names {
-		fmt.Fprintf(h, "%s\x00%d\x00", n, len(files[n]))
-		h.Write(files[n])
-	}
-	cache, err := engine.CacheDir()
-	if err != nil {
-		return "", err
-	}
-	dir := filepath.Join(cache, "ml", hex.EncodeToString(h.Sum(nil))[:16])
-	if _, err := os.Stat(dir); err == nil {
-		return dir, nil
-	}
-	if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
-		return "", err
-	}
-	tmp, err := os.MkdirTemp(filepath.Dir(dir), ".ml-")
-	if err != nil {
-		return "", err
-	}
-	defer os.RemoveAll(tmp)
-	for _, n := range names {
-		if err := os.WriteFile(filepath.Join(tmp, n), files[n], 0o644); err != nil {
-			return "", err
-		}
-	}
-	if err := os.Rename(tmp, dir); err != nil && !os.IsExist(err) {
-		if _, statErr := os.Stat(dir); statErr != nil {
-			return "", err
-		}
-	}
-	return dir, nil
-}
-
 // Script writes an embedded script, its lockfile and the device rule into
 // the cache and returns the script's path.
 func Script(name string) (string, error) {
@@ -89,7 +45,7 @@ func Script(name string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("%s has no lockfile", name)
 	}
-	dir, err := cached(map[string][]byte{name: py, name + ".lock": lock, deviceModule: deviceRule})
+	dir, err := engine.Cached("ml", map[string][]byte{name: py, name + ".lock": lock, deviceModule: deviceRule}, nil)
 	if err != nil {
 		return "", err
 	}
@@ -99,7 +55,7 @@ func Script(name string) (string, error) {
 // ToolDevice is the device a pinned tool's torch model runs on, by the same
 // rule the scripts import, asked of the tool's own torch.
 func ToolDevice(ctx context.Context, t pins.PyTool) (string, error) {
-	dir, err := cached(map[string][]byte{deviceModule: deviceRule})
+	dir, err := engine.Cached("ml", map[string][]byte{deviceModule: deviceRule}, nil)
 	if err != nil {
 		return "", err
 	}

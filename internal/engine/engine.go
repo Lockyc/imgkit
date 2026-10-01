@@ -11,14 +11,18 @@ package engine
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -50,6 +54,53 @@ func xdg(env, fallback string) (string, error) {
 		return "", err
 	}
 	return filepath.Join(home, fallback, "imgkit"), nil
+}
+
+// Cached returns a cache directory holding files, named by a hash of their
+// names and contents so a new imgkit never runs a file an older one left
+// behind. When the directory is absent it is built in a fresh one: files are
+// written, then build (if not nil) runs in it, then it is renamed into place
+// whole, so a reader never sees a half-built directory and concurrent builds
+// of one key cannot interleave.
+func Cached(kind string, files map[string][]byte, build func(dir string) error) (string, error) {
+	names := slices.Sorted(maps.Keys(files))
+	h := sha256.New()
+	for _, n := range names {
+		fmt.Fprintf(h, "%s\x00%d\x00", n, len(files[n]))
+		h.Write(files[n])
+	}
+	cache, err := CacheDir()
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(cache, kind, hex.EncodeToString(h.Sum(nil))[:16])
+	if _, err := os.Stat(dir); err == nil {
+		return dir, nil
+	}
+	if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
+		return "", err
+	}
+	tmp, err := os.MkdirTemp(filepath.Dir(dir), "."+kind+"-")
+	if err != nil {
+		return "", err
+	}
+	defer os.RemoveAll(tmp)
+	for _, n := range names {
+		if err := os.WriteFile(filepath.Join(tmp, n), files[n], 0o644); err != nil {
+			return "", err
+		}
+	}
+	if build != nil {
+		if err := build(tmp); err != nil {
+			return "", err
+		}
+	}
+	if err := os.Rename(tmp, dir); err != nil {
+		if _, statErr := os.Stat(dir); statErr != nil {
+			return "", err
+		}
+	}
+	return dir, nil
 }
 
 // ManagedDir is where a managed engine's pinned version is unpacked.

@@ -5,12 +5,9 @@ package vision
 
 import (
 	"context"
-	"crypto/sha256"
 	_ "embed"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -41,33 +38,12 @@ func available(goos, version string) error {
 }
 
 func helper(ctx context.Context) (string, error) {
-	sum := sha256.Sum256(source)
-	cache, err := engine.CacheDir()
-	if err != nil {
-		return "", err
-	}
-	dir := filepath.Join(cache, "vision", hex.EncodeToString(sum[:])[:16])
-	bin := filepath.Join(dir, "imgkit-vision")
-	if fi, err := os.Stat(bin); err == nil && fi.Mode()&0o111 != 0 {
-		return bin, nil
-	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", err
-	}
-	// A build directory of its own, so concurrent runs never write one file.
-	build, err := os.MkdirTemp(dir, ".build-")
-	if err != nil {
-		return "", err
-	}
-	defer os.RemoveAll(build)
-	src, out := filepath.Join(build, "mask.swift"), filepath.Join(build, "imgkit-vision")
-	if err := os.WriteFile(src, source, 0o644); err != nil {
-		return "", err
-	}
-	if _, err := engine.Run(ctx, engine.Cmd{Engine: "swiftc", Args: []string{"-O", src, "-o", out}, Inputs: []string{src}, Outputs: []string{out}, Timeout: 5 * time.Minute}); err != nil {
-		return "", err
-	}
-	return bin, os.Rename(out, bin)
+	dir, err := engine.Cached("vision", map[string][]byte{"mask.swift": source}, func(dir string) error {
+		src, out := filepath.Join(dir, "mask.swift"), filepath.Join(dir, "imgkit-vision")
+		_, err := engine.Run(ctx, engine.Cmd{Engine: "swiftc", Args: []string{"-O", src, "-o", out}, Inputs: []string{src}, Outputs: []string{out}, Timeout: 5 * time.Minute})
+		return err
+	})
+	return filepath.Join(dir, "imgkit-vision"), err
 }
 
 // Mask writes in's foreground, alpha as the mask, to out.
