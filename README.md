@@ -13,8 +13,8 @@ against a committed set of test images rather than judged by eye.
 
 ## Status
 
-`version` and `doctor` work; the rest of the table is being built (see the
-roadmap). The command set below is the design, not a feature list. The
+`version`, `doctor`, `render`, `press`, `diff`, `fonts`, `qr` and `grade apply`
+work; the rest of the table is being built (see the roadmap). The command set below is the design, not a feature list. The
 build order is in [docs/roadmap.md](docs/roadmap.md), and how it is built is in
 [docs/design.md](docs/design.md).
 

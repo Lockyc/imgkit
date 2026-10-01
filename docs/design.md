@@ -27,6 +27,7 @@ internal/cli/        flag, exit-code and error conventions every command shares
 internal/engine/     the one way an external tool is run
 internal/enginetest/ sh stubs that stand in for engines in tests
 internal/pins/       the one table of engine versions
+internal/pdf/        PDF page count, page boxes and text through poppler
 internal/policy/     the imgkit.toml synthesis policy
 internal/raster/     in-process pixel work: load, measure, small PNG edits
 internal/ml/         embedded single-file Python scripts (uv run --script)
@@ -43,8 +44,8 @@ quality/             the test images, their licences, and cases.toml
   alone, because Chrome exits 0 on failure and prints noise on success;
 - a per-engine stderr policy: fatal for Ghostscript, where stderr is the only
   sign it dropped an image;
-- per-engine exit-code handling: `magick compare` exits 1 whenever the images
-  differ, which is not an error.
+- per-call exit-code handling (`engine.Cmd.OKExit`) for tools whose non-zero
+  exit is not an error.
 
 `internal/pins` is the only place an engine version is written down. `doctor`
 reads it, and so does every "not installed" error, which prints the exact
@@ -82,12 +83,14 @@ colours, or renders what it is given.
   An optional despill pulls a named contaminating hue toward the local clean
   colour. `--height` sets the working size, and it must never be smaller than
   the largest size the cut-out will be drawn at.
-- **render** — refuses a render above Chrome's screenshot ceiling (about
-  60 MP), which Chrome otherwise truncates silently. It warns when a page size
-  is not a multiple of 8 CSS px, which Chrome's PDF backend rounds to. It
-  deletes stale outputs first, stamps the PNG's pHYs at 96 × scale DPI, and
-  fails if the page text contains a `--fail-if` string: dumped DOM for PNG,
-  `pdftotext` for PDF.
+- **render** — refuses a PNG beyond the largest size verified whole on the
+  pinned engine (`render.maxSide`), since Chrome has cut large screenshots
+  short with exit 0; checks the PNG is exactly size × scale. It warns when a
+  PDF page size is not a multiple of 8 CSS px, which Chrome's PDF backend
+  rounds to, and fails when the PDF's page box does not match `--size` (no
+  matching `@page` prints Letter). It deletes stale outputs first, stamps the
+  PNG's pHYs at 96 × scale DPI, and fails if the page text contains a
+  `--fail-if` string: dumped DOM for PNG, `pdftotext` for PDF.
 - **press** — Ghostscript pdfwrite with outlined text, CMYK conversion to a
   supplied ICC, fixed media from the input's page box, and images downsampled
   only above `--max-ppi`. It then checks the result has no fonts, no RGB, and
