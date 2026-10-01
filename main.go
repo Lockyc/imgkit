@@ -12,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/lockyc/imgkit/internal/cutout"
 	"github.com/lockyc/imgkit/internal/diff"
 	"github.com/lockyc/imgkit/internal/doctor"
 	"github.com/lockyc/imgkit/internal/fonts"
@@ -37,6 +38,7 @@ var commands = []command{
 	{"fonts", "embed web fonts into a CSS file as data: URIs", fonts.Main},
 	{"qr", "a QR code SVG, dark on light, quiet zone included", qr.Main},
 	{"grade", "grade apply: apply a HALD colour lookup, keeping transparency", grade.Main},
+	{"cutout", "lift the subject out of an image as RGBA, down to hair and fur", cutout.Main},
 }
 
 func main() {
