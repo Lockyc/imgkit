@@ -26,3 +26,13 @@ func TestPixelAndDPI(t *testing.T) {
 		t.Errorf("dpi = %v", v)
 	}
 }
+
+func TestPixelRejectsOutOfRangeAt(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "a.png")
+	raster.SavePNG(p, image.NewRGBA(image.Rect(0, 0, 10, 10)))
+	for _, at := range []string{"-0.1,0", "0,1.5", "2,2", "NaN,0", "0,NaN"} {
+		if _, err := Metrics["pixel"](Params{"image": p, "at": at, "color": "#000000"}); err == nil {
+			t.Errorf("at %q accepted", at)
+		}
+	}
+}

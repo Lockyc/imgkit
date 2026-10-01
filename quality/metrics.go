@@ -1,11 +1,11 @@
 package quality
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 	"strings"
 
-	"fmt"
 	"github.com/makiuchi-d/gozxing"
 	"github.com/makiuchi-d/gozxing/qrcode"
 
@@ -125,7 +125,8 @@ func pixel(p Params) (float64, error) {
 	fy, err2 := strconv.ParseFloat(ys, 64)
 	hex := strings.TrimPrefix(p.String("color", ""), "#")
 	want, err3 := strconv.ParseUint(hex, 16, 32)
-	if err1 != nil || err2 != nil || err3 != nil || len(hex) != 6 {
+	inUnit := func(f float64) bool { return f >= 0 && f <= 1 } // false for NaN
+	if err1 != nil || err2 != nil || err3 != nil || len(hex) != 6 || !inUnit(fx) || !inUnit(fy) {
 		return 0, fmt.Errorf("pixel: want at = \"x,y\" and color = \"#rrggbb\"")
 	}
 	b := img.Bounds()
