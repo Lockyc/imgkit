@@ -250,7 +250,7 @@ func run(ctx context.Context, path string, c Cmd) (Result, error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, path, c.Args...)
+	cmd := exec.CommandContext(ctx, path, pathArgs(c)...)
 	stdout, err := scratch()
 	if err != nil {
 		return Result{}, err
@@ -289,6 +289,19 @@ func run(ctx context.Context, path string, c Cmd) (Result, error) {
 		}
 	}
 	return res, nil
+}
+
+// pathArgs is c.Args with each argument that is one of c's Inputs or Outputs
+// and begins with "-" prefixed "./", so the engine reads a file named
+// "-x.pdf" as a file rather than a flag.
+func pathArgs(c Cmd) []string {
+	args := slices.Clone(c.Args)
+	for i, a := range args {
+		if strings.HasPrefix(a, "-") && (slices.Contains(c.Inputs, a) || slices.Contains(c.Outputs, a)) {
+			args[i] = "./" + a
+		}
+	}
+	return args
 }
 
 // scratch is an anonymous temporary file: unlinked at once, gone on Close.

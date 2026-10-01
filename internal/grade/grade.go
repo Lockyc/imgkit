@@ -55,7 +55,7 @@ func applyMain(ctx context.Context, args []string, stdout, stderr io.Writer) int
 }
 
 func apply(ctx context.Context, in, clut, out string) error {
-	res, err := engine.Run(ctx, engine.Cmd{Engine: "magick", Args: []string{"identify", "-format", "%[opaque] %w %h\n", in, clut}})
+	res, err := engine.Run(ctx, engine.Cmd{Engine: "magick", Args: []string{"identify", "-format", "%[opaque] %w %h\n", in, clut}, Inputs: []string{in, clut}})
 	if err != nil {
 		return err
 	}

@@ -85,6 +85,19 @@ func TestVersionReportsAnExecFailure(t *testing.T) {
 	}
 }
 
+func TestRunPassesDashPathsAsFiles(t *testing.T) {
+	log := enginetest.Stub(t, "magick", `cp "$1" "$2"`)
+	dir := t.TempDir()
+	t.Chdir(dir)
+	os.WriteFile("-in.png", []byte("x"), 0o644)
+	if _, err := engine.Run(ctx, engine.Cmd{Engine: "magick", Args: []string{"-in.png", "-out.png"}, Inputs: []string{"-in.png"}, Outputs: []string{"-out.png"}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := enginetest.Calls(t, log)[0]; !slices.Equal(got, []string{"./-in.png", "./-out.png"}) {
+		t.Fatalf("args = %q", got)
+	}
+}
+
 func TestRunStderrPolicy(t *testing.T) {
 	enginetest.Stub(t, "gs", `echo "   **** Error: rangecheck" >&2`)
 	if _, err := engine.Run(ctx, engine.Cmd{Engine: "gs"}); err != nil {
