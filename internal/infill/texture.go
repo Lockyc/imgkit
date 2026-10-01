@@ -379,7 +379,7 @@ func (s sat) sum(x, y, p int) float64 {
 // blur is a Gaussian blur of a w x h plane at sigma, as three box passes
 // each way, with edges clamped.
 func blur(src []float32, w, h int, sigma float64) []float32 {
-	r := max(1, int(math.Round((math.Sqrt(4*sigma*sigma+1)-1)/2)))
+	r := boxRadius(sigma)
 	out := slices.Clone(src)
 	tmp := make([]float32, len(src))
 	for range 3 {
@@ -404,4 +404,10 @@ func boxPass(src, dst []float32, n, lines, r, step, spacing int) {
 			s += at(base, k+r+1) - at(base, k-r)
 		}
 	}
+}
+
+// boxRadius is the radius of each of blur's three box passes at sigma, so
+// its support is three times this.
+func boxRadius(sigma float64) int {
+	return max(1, int(math.Round((math.Sqrt(4*sigma*sigma+1)-1)/2)))
 }

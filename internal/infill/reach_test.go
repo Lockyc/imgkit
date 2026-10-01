@@ -5,6 +5,7 @@ import (
 	"math"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/lockyc/imgkit/internal/raster"
 )
@@ -266,5 +267,27 @@ func TestEdgeStopsCutOffABlockByItsPullOnTheHole(t *testing.T) {
 		if f := frac(1000, 1000, cut, func(x, y int) bool { return !in(x, y) && !block(x, y) && (y < top-10 || y >= top+c.tall+10) }); f > 0.001 {
 			t.Errorf("%s: %.4f of the ground is cut off, want none", c.name, f)
 		}
+	}
+}
+
+// A patterned ground holds a missed part per motif, each off the hole's
+// tone; at an A4 page at 300 dpi, with specks in the mask stretching the
+// crop over the whole page, judging them all must stay quick. (Blurring the
+// crop once per part took over ten minutes on a page like this.)
+func TestEdgeStopsKeepPaceOnAPatternedPage(t *testing.T) {
+	const w, h = 2480, 3508
+	in := disc(w/2, h/2, 150)
+	holes, _ := ground(t, t.TempDir(), w, h, func(x, y int) (int, int) {
+		if x%50 < 20 && y%50 < 20 {
+			return 30, 5
+		}
+		return 160, 10
+	}, func(x, y int) bool { return in(x, y) || (x%700 == 25 && y%700 == 25) })
+	start := time.Now()
+	if _, err := edgeStops(holes, t.TempDir(), 3, 150); err != nil {
+		t.Fatal(err)
+	}
+	if d := time.Since(start); d > 15*time.Second {
+		t.Errorf("edge stops took %v on a patterned page, want under 15s", d)
 	}
 }
