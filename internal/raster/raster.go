@@ -133,3 +133,34 @@ func RMSE(a, b *image.RGBA64, r image.Rectangle, ch Channels) (float64, error) {
 	}
 	return math.Sqrt(sum / float64(n)), nil
 }
+
+// RMSEMasked is RMSE over the pixels where mask is more than half white.
+func RMSEMasked(a, b, mask *image.RGBA64, ch Channels) (float64, error) {
+	if a.Bounds() != b.Bounds() || a.Bounds() != mask.Bounds() {
+		return 0, fmt.Errorf("sizes differ")
+	}
+	var sum float64
+	var n int
+	r := a.Bounds()
+	for y := r.Min.Y; y < r.Max.Y; y++ {
+		for x := r.Min.X; x < r.Max.X; x++ {
+			if mask.RGBA64At(x, y).R <= 0x7fff {
+				continue
+			}
+			pa, pb := a.RGBA64At(x, y), b.RGBA64At(x, y)
+			ds := []float64{float64(pa.A) - float64(pb.A)}
+			if ch == RGB {
+				ds = []float64{float64(pa.R) - float64(pb.R), float64(pa.G) - float64(pb.G), float64(pa.B) - float64(pb.B)}
+			}
+			for _, d := range ds {
+				d /= 65535
+				sum += d * d
+				n++
+			}
+		}
+	}
+	if n == 0 {
+		return 0, fmt.Errorf("the mask selects no pixels")
+	}
+	return math.Sqrt(sum / float64(n)), nil
+}

@@ -2,6 +2,7 @@ package quality
 
 import (
 	"fmt"
+	"image"
 	"math"
 	"strconv"
 	"strings"
@@ -59,8 +60,9 @@ var Metrics = map[string]Metric{
 	"rmse": rmse,
 }
 
-// rmse compares images a and b. Optional: region (x,y,w,h fractions) and
-// channels ("rgb", the default, or "alpha").
+// rmse compares images a and b. Optional: region (x,y,w,h fractions),
+// channels ("rgb", the default, or "alpha") and mask (an image whose white
+// pixels are the ones measured).
 func rmse(p Params) (float64, error) {
 	ap, err := p.Path("a")
 	if err != nil {
@@ -91,6 +93,13 @@ func rmse(p Params) (float64, error) {
 		ch = raster.Alpha
 	default:
 		return 0, fmt.Errorf("channels: want rgb or alpha")
+	}
+	if mp, err := p.Path("mask"); err == nil {
+		mask, err := raster.Load(mp)
+		if err != nil {
+			return 0, err
+		}
+		return raster.RMSEMasked(a, b, mask, ch)
 	}
 	return raster.RMSE(a, b, r, ch)
 }
@@ -159,4 +168,194 @@ func qrDecodes(p Params) (float64, error) {
 		return 0, nil
 	}
 	return 1, nil
+}
+
+func init() {
+	Metrics["green-fringe"] = greenFringe
+	Metrics["seethrough"] = seethrough
+	Metrics["std-ratio"] = stdRatio
+}
+
+func hexColour(s string) ([3]float64, error) {
+	s = strings.TrimPrefix(s, "#")
+	v, err := strconv.ParseUint(s, 16, 32)
+	if err != nil || len(s) != 6 {
+		return [3]float64{}, fmt.Errorf("%q: want #rrggbb", s)
+	}
+	return [3]float64{float64(v>>16&0xff) / 255, float64(v>>8&0xff) / 255, float64(v&0xff) / 255}, nil
+}
+
+// greenFringe composites the cut-out over bg (premultiplied colour + (1-a)·bg)
+// and counts green-dominant pixels among those with any coverage.
+func greenFringe(p Params) (float64, error) {
+	path, err := p.Path("image")
+	if err != nil {
+		return 0, err
+	}
+	img, err := raster.Load(path)
+	if err != nil {
+		return 0, err
+	}
+	bg, err := hexColour(p.String("bg", ""))
+	if err != nil {
+		return 0, err
+	}
+	margin, err := p.Float("margin", 10)
+	if err != nil {
+		return 0, err
+	}
+	m := margin / 255
+	r := img.Bounds()
+	if f, ok, err := p.Frac("region"); err != nil {
+		return 0, err
+	} else if ok {
+		r = f.In(r)
+	}
+	var n, total int
+	for y := r.Min.Y; y < r.Max.Y; y++ {
+		for x := r.Min.X; x < r.Max.X; x++ {
+			c := img.RGBA64At(x, y)
+			total++
+			a := float64(c.A) / 65535
+			if a <= 0.02 {
+				continue
+			}
+			R := float64(c.R)/65535 + (1-a)*bg[0]
+			G := float64(c.G)/65535 + (1-a)*bg[1]
+			B := float64(c.B)/65535 + (1-a)*bg[2]
+			if G > R+m && G > B+m {
+				n++
+			}
+		}
+	}
+	return float64(n) / float64(total), nil
+}
+
+func parsePolygon(s string) ([][2]float64, error) {
+	var pts [][2]float64
+	for _, pair := range strings.Fields(s) {
+		xs, ys, ok := strings.Cut(pair, ",")
+		x, e1 := strconv.ParseFloat(xs, 64)
+		y, e2 := strconv.ParseFloat(ys, 64)
+		if !ok || e1 != nil || e2 != nil {
+			return nil, fmt.Errorf("polygon point %q: want x,y fractions", pair)
+		}
+		pts = append(pts, [2]float64{x, y})
+	}
+	if len(pts) < 3 {
+		return nil, fmt.Errorf("a polygon needs at least 3 points")
+	}
+	return pts, nil
+}
+
+func inside(pts [][2]float64, x, y float64) bool {
+	in := false
+	for i, j := 0, len(pts)-1; i < len(pts); j, i = i, i+1 {
+		xi, yi, xj, yj := pts[i][0], pts[i][1], pts[j][0], pts[j][1]
+		if (yi > y) != (yj > y) && x < (xj-xi)*(y-yi)/(yj-yi)+xi {
+			in = !in
+		}
+	}
+	return in
+}
+
+// seethrough is the share of pixels inside the solid polygon that are not
+// nearly opaque: fur or body the matte left transparent.
+func seethrough(p Params) (float64, error) {
+	path, err := p.Path("image")
+	if err != nil {
+		return 0, err
+	}
+	img, err := raster.Load(path)
+	if err != nil {
+		return 0, err
+	}
+	pts, err := parsePolygon(p.String("solid", ""))
+	if err != nil {
+		return 0, err
+	}
+	b := img.Bounds()
+	var n, total int
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			if !inside(pts, (float64(x-b.Min.X)+0.5)/float64(b.Dx()), (float64(y-b.Min.Y)+0.5)/float64(b.Dy())) {
+				continue
+			}
+			total++
+			if float64(img.RGBA64At(x, y).A)/65535 < 0.9 {
+				n++
+			}
+		}
+	}
+	if total == 0 {
+		return 0, fmt.Errorf("the solid polygon covers no pixels")
+	}
+	return float64(n) / float64(total), nil
+}
+
+func luma(img *image.RGBA64, x, y int) float64 {
+	c := img.RGBA64At(x, y)
+	return (0.2126*float64(c.R) + 0.7152*float64(c.G) + 0.0722*float64(c.B)) / 65535
+}
+
+// std is the population standard deviation, by Welford's update, which
+// gives exactly 0 for a constant fill.
+func std(vals []float64) float64 {
+	var mean, sq float64
+	for i, v := range vals {
+		d := v - mean
+		mean += d / float64(i+1)
+		sq += d * (v - mean)
+	}
+	return math.Sqrt(sq / float64(len(vals)))
+}
+
+// stdRatio compares a fill's texture with the ground around the hole: the
+// luma std-dev inside the mask in a, over the std-dev of the ring (the mask's
+// bounding box grown by ring px, less the mask) in b. Below 1 means the
+// fill is flatter than its surroundings.
+func stdRatio(p Params) (float64, error) {
+	var imgs [3]*image.RGBA64
+	for i, k := range []string{"a", "b", "mask"} {
+		path, err := p.Path(k)
+		if err != nil {
+			return 0, err
+		}
+		if imgs[i], err = raster.Load(path); err != nil {
+			return 0, err
+		}
+	}
+	a, b, mask := imgs[0], imgs[1], imgs[2]
+	ringF, err := p.Float("ring", 20)
+	if err != nil {
+		return 0, err
+	}
+	ring := int(ringF)
+	box := image.Rectangle{}
+	var fill []float64
+	for y := mask.Bounds().Min.Y; y < mask.Bounds().Max.Y; y++ {
+		for x := mask.Bounds().Min.X; x < mask.Bounds().Max.X; x++ {
+			if mask.RGBA64At(x, y).R > 0x7fff {
+				fill = append(fill, luma(a, x, y))
+				box = box.Union(image.Rect(x, y, x+1, y+1))
+			}
+		}
+	}
+	if len(fill) == 0 {
+		return 0, fmt.Errorf("the mask is empty")
+	}
+	var around []float64
+	grown := box.Inset(-ring).Intersect(b.Bounds())
+	for y := grown.Min.Y; y < grown.Max.Y; y++ {
+		for x := grown.Min.X; x < grown.Max.X; x++ {
+			if mask.RGBA64At(x, y).R <= 0x7fff {
+				around = append(around, luma(b, x, y))
+			}
+		}
+	}
+	s := std(around)
+	if s == 0 {
+		return 0, fmt.Errorf("the ground around the mask has no texture to compare with")
+	}
+	return std(fill) / s, nil
 }

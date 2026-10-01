@@ -46,6 +46,22 @@ func TestRMSE(t *testing.T) {
 	}
 }
 
+func TestRMSEMasked(t *testing.T) {
+	black, white := solid(4, 4, color.Black), solid(4, 4, color.White)
+	mask := solid(4, 4, color.Black)
+	for y := 0; y < 2; y++ {
+		for x := 0; x < 4; x++ {
+			mask.Set(x, y, color.White)
+		}
+	}
+	if v, err := RMSEMasked(black, white, mask, RGB); err != nil || math.Abs(v-1) > 1e-9 {
+		t.Errorf("half mask, black vs white = %v, %v; want 1", v, err)
+	}
+	if _, err := RMSEMasked(black, white, solid(4, 4, color.Black), RGB); err == nil {
+		t.Error("an all-black mask was accepted")
+	}
+}
+
 func TestParseFrac(t *testing.T) {
 	f, err := ParseFrac("0,0.88,1,0.12")
 	if err != nil || f != (Frac{0, 0.88, 1, 0.12}) {
