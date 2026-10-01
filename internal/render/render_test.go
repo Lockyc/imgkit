@@ -269,3 +269,11 @@ func TestPageURLEscapes(t *testing.T) {
 		t.Error("missing page accepted")
 	}
 }
+
+func TestRenderSameOutputPathSpelledDifferently(t *testing.T) {
+	e := setup(t, 1, 1)
+	t.Chdir(e.dir)
+	if code := e.run("--size", "100x50", "--png", "./x", "--pdf", "x", e.page); code != 2 {
+		t.Errorf("code %d, want 2", code)
+	}
+}

@@ -69,7 +69,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	scale := fs.Float64("scale", 1, "device scale factor; the PNG is size × scale px at 96 × scale dpi")
 	budget := fs.Int("budget", 5000, "virtual-time budget in ms for scripts, fonts and images to settle")
 	var failIf multi
-	fs.Var(&failIf, "fail-if", "fail when the rendered page's text contains `TEXT` (repeatable)")
+	fs.Var(&failIf, "fail-if", "fail when `TEXT` appears in the page: its markup (dumped DOM) for --png, its extracted text for --pdf (repeatable)")
 	rest, code, ok := cli.Parse(fs, args, 1)
 	if !ok {
 		return code
@@ -96,7 +96,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if math.IsNaN(j.scale) || math.IsInf(j.scale, 0) || j.scale <= 0 || j.budget < 0 {
 		return usageErr("--scale must be a finite number above 0 and --budget not below 0")
 	}
-	if j.png != "" && j.png == j.pdf {
+	if j.png != "" && j.pdf != "" && engine.SameFile(j.png, j.pdf) {
 		return usageErr("--png and --pdf name the same file")
 	}
 	u, local, err := pageURL(rest[0])
