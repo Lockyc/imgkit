@@ -1,0 +1,76 @@
+// Package grade moves colours, never pixels: fit (Phase 3) recovers a
+// reference's colour treatment as a HALD lookup table, and apply runs one
+// through ImageMagick. -hald-clut on an image with alpha returns an opaque
+// rectangle, so apply grades the colour alone and puts the alpha back.
+package grade
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"math"
+	"path/filepath"
+	"strconv"
+	"strings"
+
+	"github.com/lockyc/imgkit/internal/cli"
+	"github.com/lockyc/imgkit/internal/engine"
+)
+
+const usage = "grade apply --clut hald.png <in> <out.png>"
+
+// Main dispatches `imgkit grade <subcommand>`.
+func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "apply":
+			return applyMain(ctx, args[1:], stdout, stderr)
+		}
+	}
+	fmt.Fprintf(stderr, "usage: imgkit %s\n", usage)
+	return 2
+}
+
+func applyMain(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+	fs := cli.Flags("grade apply", "grade apply --clut hald.png <in> <out.png>", stderr)
+	clut := fs.String("clut", "", "the HALD CLUT image (required)")
+	rest, code, ok := cli.Parse(fs, args, 2)
+	if !ok {
+		return code
+	}
+	if *clut == "" || strings.ToLower(filepath.Ext(rest[1])) != ".png" {
+		fmt.Fprintln(stderr, "imgkit grade apply: give --clut, and an output ending .png")
+		return 2
+	}
+	if err := apply(ctx, rest[0], *clut, rest[1]); err != nil {
+		return cli.Fail(stderr, "grade apply", err)
+	}
+	fmt.Fprintf(stdout, "wrote %s\n", rest[1])
+	return 0
+}
+
+func apply(ctx context.Context, in, clut, out string) error {
+	res, err := engine.Run(ctx, engine.Cmd{Engine: "magick", Args: []string{"identify", "-format", "%[opaque] %w %h\n", in, clut}})
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(strings.TrimSpace(string(res.Stdout)), "\n")
+	if len(lines) != 2 {
+		return fmt.Errorf("could not read %s and %s", in, clut)
+	}
+	opaque := strings.HasPrefix(lines[0], "True")
+	cf := strings.Fields(lines[1])
+	w, _ := strconv.Atoi(cf[1])
+	h, _ := strconv.Atoi(cf[2])
+	level := int(math.Round(math.Cbrt(float64(w))))
+	if w != h || level*level*level != w {
+		return fmt.Errorf("%s is %dx%d, not a HALD CLUT (a square of side level³, e.g. 512 for level 8)", clut, w, h)
+	}
+	args := []string{in, "-alpha", "off", clut, "-hald-clut", out}
+	if !opaque {
+		args = []string{in, "-write", "mpr:src", "-alpha", "off", clut, "-hald-clut",
+			"(", "mpr:src", "-alpha", "extract", ")", "-alpha", "off", "-compose", "CopyOpacity", "-composite", out}
+	}
+	_, err = engine.Run(ctx, engine.Cmd{Engine: "magick", Args: args, Inputs: []string{in, clut}, Outputs: []string{out}})
+	return err
+}

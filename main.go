@@ -15,6 +15,7 @@ import (
 	"github.com/lockyc/imgkit/internal/diff"
 	"github.com/lockyc/imgkit/internal/doctor"
 	"github.com/lockyc/imgkit/internal/fonts"
+	"github.com/lockyc/imgkit/internal/grade"
 	"github.com/lockyc/imgkit/internal/press"
 	"github.com/lockyc/imgkit/internal/qr"
 	"github.com/lockyc/imgkit/internal/render"
@@ -35,6 +36,7 @@ var commands = []command{
 	{"diff", "compare two images after lining them up vertically", diff.Main},
 	{"fonts", "embed web fonts into a CSS file as data: URIs", fonts.Main},
 	{"qr", "a QR code SVG, dark on light, quiet zone included", qr.Main},
+	{"grade", "grade apply: apply a HALD colour lookup, keeping transparency", grade.Main},
 }
 
 func main() {
