@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"os"
 	"strings"
 	"testing"
 )
@@ -40,5 +41,21 @@ func TestEveryCommandIsInUsage(t *testing.T) {
 		if !strings.Contains(u, "  "+c.name+" ") {
 			t.Errorf("usage lacks %q", c.name)
 		}
+	}
+}
+
+func TestSynthesisPolicy(t *testing.T) {
+	t.Chdir(t.TempDir())
+	os.WriteFile("imgkit.toml", []byte(`synthesis = "forbid"`), 0o644)
+	for _, c := range commands {
+		var out, errb bytes.Buffer
+		code := run(context.Background(), []string{c.name, "-h"}, &out, &errb)
+		forbidden := code == 1 && strings.Contains(errb.String(), "forbid")
+		if forbidden != c.synthesises {
+			t.Errorf("%s under synthesis = forbid: code %d, %q", c.name, code, errb.String())
+		}
+	}
+	if !strings.Contains(usage(), "upscale    enlarge 4x with DAT (synthesises pixels)") {
+		t.Errorf("usage does not mark the synthesising commands:\n%s", usage())
 	}
 }

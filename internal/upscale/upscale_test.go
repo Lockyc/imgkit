@@ -64,19 +64,6 @@ func TestFrameOrder(t *testing.T) {
 	}
 }
 
-func TestUpscaleForbidden(t *testing.T) {
-	t.Chdir(t.TempDir())
-	magick, uv := stubs(t)
-	os.WriteFile("imgkit.toml", []byte(`synthesis = "forbid"`), 0o644)
-	var o, e bytes.Buffer
-	if code := Main(context.Background(), []string{"in.png", "o.png"}, &o, &e); code != 1 || !strings.Contains(e.String(), "forbid") {
-		t.Errorf("forbidden: code %d, %q", code, e.String())
-	}
-	if len(enginetest.Calls(t, magick))+len(enginetest.Calls(t, uv)) != 0 {
-		t.Error("an engine ran")
-	}
-}
-
 func TestUpscaleRefusesSameFile(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)

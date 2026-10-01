@@ -19,7 +19,6 @@ import (
 	imgframe "github.com/lockyc/imgkit/internal/frame"
 	"github.com/lockyc/imgkit/internal/ml"
 	"github.com/lockyc/imgkit/internal/pins"
-	"github.com/lockyc/imgkit/internal/policy"
 )
 
 const usage = "upscale <in> <out.png>\n\nThe output is an 8-bit PNG, alpha kept where the source has any."
@@ -42,13 +41,6 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 }
 
 func run(ctx context.Context, in, out string) error {
-	wd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	if err := policy.CheckSynthesis(wd, "upscale"); err != nil {
-		return err
-	}
 	// The model reads a temporary frame, so no engine call names both <in>
 	// and <out>; this is the one place that can refuse them being the same.
 	if engine.SameFile(in, out) {

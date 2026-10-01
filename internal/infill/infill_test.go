@@ -184,13 +184,8 @@ func TestInfillRefuses(t *testing.T) {
 	if code := Main(context.Background(), []string{"--mask", pngOf(t, dir, "m2.png", 40, 30), "--levels", "6,20", in, out}, &o, &e); code != 2 {
 		t.Errorf("ascending levels: code %d", code)
 	}
-	os.WriteFile("imgkit.toml", []byte(`synthesis = "forbid"`), 0o644)
-	e.Reset()
-	if code := Main(context.Background(), []string{"--mask", pngOf(t, dir, "m3.png", 40, 30), in, out}, &o, &e); code != 1 || !strings.Contains(e.String(), "forbid") {
-		t.Errorf("forbidden: code %d, %q", code, e.String())
-	}
 	if n := len(calls(t, log)); n != 2 {
-		t.Errorf("magick ran %d times for refused infills, want only the mismatched mask's two orients", n)
+		t.Errorf("magick ran %d times, want only the mismatched mask's two orients", n)
 	}
 }
 

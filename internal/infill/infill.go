@@ -20,7 +20,6 @@ import (
 	"github.com/lockyc/imgkit/internal/engine"
 	"github.com/lockyc/imgkit/internal/frame"
 	"github.com/lockyc/imgkit/internal/imgsize"
-	"github.com/lockyc/imgkit/internal/policy"
 )
 
 const usage = "infill --mask mask.png [--levels 150,60,20,6] [--grain 1] [--seed 1] <in> <out.png>\n\nThe output keeps the input's bit depth and colour profile, turned upright by its EXIF rotation."
@@ -55,13 +54,6 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 }
 
 func run(ctx context.Context, in, mask, out string, radii []int, grain float64, seed int) error {
-	wd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	if err := policy.CheckSynthesis(wd, "infill"); err != nil {
-		return err
-	}
 	// The step that writes <out> reads temp files, so no engine call names
 	// both <in> or <mask> and <out>; this is the one place that can refuse
 	// before the temp work runs.

@@ -108,11 +108,6 @@ func TestInpaintRefuses(t *testing.T) {
 	if code := Main(context.Background(), []string{"--mask", pngOf(t, dir, "m.png", 20, 15), in, out}, &o, &e); code != 1 || !strings.Contains(e.String(), "40x30") {
 		t.Errorf("mismatched mask: code %d, %q", code, e.String())
 	}
-	os.WriteFile(filepath.Join(dir, "imgkit.toml"), []byte(`synthesis = "forbid"`), 0o644)
-	e.Reset()
-	if code := Main(context.Background(), []string{"--mask", pngOf(t, dir, "m2.png", 40, 30), in, out}, &o, &e); code != 1 || !strings.Contains(e.String(), "forbid") {
-		t.Errorf("forbidden: code %d, %q", code, e.String())
-	}
 	if len(enginetest.Calls(t, log)) != 0 {
 		t.Error("iopaint ran for a refused inpaint")
 	}

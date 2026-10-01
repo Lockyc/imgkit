@@ -18,7 +18,6 @@ import (
 	"github.com/lockyc/imgkit/internal/imgsize"
 	"github.com/lockyc/imgkit/internal/ml"
 	"github.com/lockyc/imgkit/internal/pins"
-	"github.com/lockyc/imgkit/internal/policy"
 )
 
 const usage = "inpaint --mask mask.png <in> <out.png>"
@@ -42,13 +41,6 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 }
 
 func run(ctx context.Context, in, mask, out string) error {
-	wd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	if err := policy.CheckSynthesis(wd, "inpaint"); err != nil {
-		return err
-	}
 	// The step that writes <out> reads a temp file, so no engine call names
 	// both <in> or <mask> and <out>; this is the one place that can refuse
 	// before the temp work runs.
