@@ -296,9 +296,6 @@ func seethrough(p Params) (float64, error) {
 	if total == 0 {
 		return 0, fmt.Errorf("the solid polygon covers no pixels")
 	}
-	if total == 0 {
-		return 0, fmt.Errorf("the region selects no pixels")
-	}
 	return float64(n) / float64(total), nil
 }
 
