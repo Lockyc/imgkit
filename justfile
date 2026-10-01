@@ -23,7 +23,7 @@ test:
 # Run the quality cases over quality/ (needs every engine and model; local only)
 [group("check")]
 quality:
-    go test -tags quality -count=1 -v ./quality/
+    go test -tags quality -count=1 -timeout 0 -v ./quality/
 
 # go vet static checks
 [group("check")]
