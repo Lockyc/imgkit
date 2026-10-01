@@ -32,3 +32,24 @@ func TestReadNoBox(t *testing.T) {
 		t.Fatal("missing page size accepted")
 	}
 }
+
+func TestReadRejectsZeroPages(t *testing.T) {
+	enginetest.Stub(t, "pdfinfo", `printf 'Pages:          0\nPage size:      595 x 842 pts\n'`)
+	if _, err := Read(context.Background(), "in.pdf"); err == nil {
+		t.Fatal("0 pages accepted")
+	}
+}
+
+func TestReadRejectsUnparsableNumbers(t *testing.T) {
+	enginetest.Stub(t, "pdfinfo", `printf 'Pages:          1\nPage size:      1.2.3 x 842 pts\n'`)
+	if _, err := Read(context.Background(), "in.pdf"); err == nil {
+		t.Fatal("unparsable page size accepted")
+	}
+}
+
+func TestPageSizesRejectsZeroPages(t *testing.T) {
+	enginetest.Stub(t, "pdfinfo", `printf 'x\n'`)
+	if _, err := PageSizes(context.Background(), "in.pdf", 0); err == nil {
+		t.Fatal("0 pages accepted")
+	}
+}

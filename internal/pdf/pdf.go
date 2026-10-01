@@ -34,22 +34,31 @@ func Read(ctx context.Context, path string) (Info, error) {
 	if p == nil || b == nil {
 		return Info{}, fmt.Errorf("%s: pdfinfo reported no page count or page size", path)
 	}
-	n, _ := strconv.Atoi(string(p[1]))
-	w, _ := strconv.ParseFloat(string(b[1]), 64)
-	h, _ := strconv.ParseFloat(string(b[2]), 64)
+	n, errN := strconv.Atoi(string(p[1]))
+	w, errW := strconv.ParseFloat(string(b[1]), 64)
+	h, errH := strconv.ParseFloat(string(b[2]), 64)
+	if errN != nil || errW != nil || errH != nil || n < 1 {
+		return Info{}, fmt.Errorf("%s: pdfinfo reported an unusable page count or size", path)
+	}
 	return Info{Pages: n, W: w, H: h}, nil
 }
 
 // PageSizes reads every page's box.
 func PageSizes(ctx context.Context, path string, pages int) ([][2]float64, error) {
+	if pages < 1 {
+		return nil, fmt.Errorf("%s: page count %d, want at least 1", path, pages)
+	}
 	res, err := engine.Run(ctx, engine.Cmd{Engine: "pdfinfo", Args: []string{"-f", "1", "-l", strconv.Itoa(pages), path}, Inputs: []string{path}})
 	if err != nil {
 		return nil, err
 	}
 	var out [][2]float64
 	for _, m := range pageBoxRe.FindAllSubmatch(res.Stdout, -1) {
-		w, _ := strconv.ParseFloat(string(m[1]), 64)
-		h, _ := strconv.ParseFloat(string(m[2]), 64)
+		w, errW := strconv.ParseFloat(string(m[1]), 64)
+		h, errH := strconv.ParseFloat(string(m[2]), 64)
+		if errW != nil || errH != nil {
+			return nil, fmt.Errorf("%s: pdfinfo listed an unusable page size %q", path, m[0])
+		}
 		out = append(out, [2]float64{w, h})
 	}
 	if len(out) != pages {

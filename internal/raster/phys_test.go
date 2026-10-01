@@ -97,3 +97,22 @@ func TestSetDPINoIHDR(t *testing.T) {
 		t.Fatal("PNG without IHDR accepted")
 	}
 }
+
+func TestSetDPIRejectsTruncatedTail(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "a.png")
+	if err := SavePNG(p, image.NewRGBA(image.Rect(0, 0, 3, 2))); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(p)
+	b = b[:len(b)-12] // drop IEND
+	os.WriteFile(p, b, 0o644)
+	if err := SetDPI(p, 96); err == nil {
+		t.Fatal("PNG without IEND accepted")
+	}
+	if got, _ := os.ReadFile(p); !bytes.Equal(got, b) {
+		t.Error("a rejected PNG was rewritten")
+	}
+	if _, err := DPI(p); err == nil {
+		t.Error("DPI accepted a PNG without IEND")
+	}
+}

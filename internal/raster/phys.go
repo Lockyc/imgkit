@@ -122,6 +122,9 @@ func split(b []byte) ([]chunk, error) {
 		out = append(out, chunk{typ: string(b[pos+4 : pos+8]), data: b[pos+8 : pos+8+n], raw: b[pos:end]})
 		pos = end
 	}
+	if len(out) == 0 || out[len(out)-1].typ != "IEND" {
+		return nil, fmt.Errorf("truncated PNG: no IEND chunk")
+	}
 	return out, nil
 }
 
