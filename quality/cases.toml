@@ -117,18 +117,18 @@ max    = 0.0
 
 [[case]]
 name   = "cutout-hair-over-foliage"
-why    = "a hard coarse mask keeps foliage between hair strands; composited on navy it reads as a green fringe"
-run    = ["cutout", "{asset:portrait-foliage.jpg}", "{tmp:cut.png}"]
+why    = "the coarse mask swallows ivy behind flyaway hair, deep enough that a narrow trimap band marks it sure subject; composited on navy it reads as a green fringe"
+run    = ["cutout", "{asset:portrait-ivy.jpg}", "{tmp:cut.png}"]
 metric = "green-fringe"
-params = { image = "{tmp:cut.png}", region = "0.27,0.27,0.47,0.45", bg = "#062d5f" }
+params = { image = "{tmp:cut.png}", region = "0.17,0,0.57,0.58", bg = "#062d5f" }
 max    = 0.00015
 
 [[case]]
 name   = "cutout-hair-over-foliage-birefnet"
 why    = "the Linux default coarse mask must reach the same edge quality"
-run    = ["cutout", "--coarse", "birefnet", "{asset:portrait-foliage.jpg}", "{tmp:cut.png}"]
+run    = ["cutout", "--coarse", "birefnet", "{asset:portrait-ivy.jpg}", "{tmp:cut.png}"]
 metric = "green-fringe"
-params = { image = "{tmp:cut.png}", region = "0.27,0.27,0.47,0.45", bg = "#062d5f" }
+params = { image = "{tmp:cut.png}", region = "0.17,0,0.57,0.58", bg = "#062d5f" }
 max    = 0.000089
 
 [[case]]

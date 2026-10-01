@@ -19,6 +19,14 @@ recipe  = "magick SOURCE -resize x2400 -crop 1800x2400+750+0 +repage -quality 90
 sha256  = "2ed7e49de36d930be63820d486072b494667627aca07df109646691288626937"
 
 [[asset]]
+file    = "portrait-ivy.jpg"
+source  = "https://commons.wikimedia.org/wiki/File:Portrait-glamour.jpg"
+author  = "Jean-Christophe Destailleur"
+licence = "CC BY-SA 3.0"
+recipe  = "cropped by imgkit: magick SOURCE -crop 2400x2206+0+0 +repage -quality 90 -strip portrait-ivy.jpg"
+sha256  = "6213bca08d5d4e9470c2fd72eaf31ca54d40d1f9a04c4ff28dcb66bae54560d8"
+
+[[asset]]
 file    = "fur-matching-ground.jpg"
 source  = "https://commons.wikimedia.org/wiki/File:Renard_polaire_DSCF2606.jpg"
 author  = "Musicaline"
