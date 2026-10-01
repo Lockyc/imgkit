@@ -371,3 +371,92 @@ func stdRatio(p Params) (float64, error) {
 	}
 	return std(fill) / s, nil
 }
+
+func init() {
+	Metrics["detail"] = detail
+}
+
+// detail scores how much of b's fine detail a reproduces, where they line
+// up: 1 - Σ(hf(a)-hf(b))² / Σhf(b)², over luma, with hf the image less its
+// Gaussian blur at sigma px (default 2). 1 is every fine stroke back in
+// place; 0 is a blur that lost them all; below 0 is invented detail that
+// misses the original's. RMSE alone is dominated by tone, so a soft result
+// and a sharp one with the same tone error read alike there.
+func detail(p Params) (float64, error) {
+	var imgs [2]*image.RGBA64
+	for i, k := range []string{"a", "b"} {
+		path, err := p.Path(k)
+		if err != nil {
+			return 0, err
+		}
+		if imgs[i], err = raster.Load(path); err != nil {
+			return 0, err
+		}
+	}
+	a, b := imgs[0], imgs[1]
+	if a.Bounds() != b.Bounds() {
+		return 0, fmt.Errorf("a and b sizes differ")
+	}
+	sigma, err := p.Float("sigma", 2)
+	if err != nil {
+		return 0, err
+	}
+	if !(sigma > 0) {
+		return 0, fmt.Errorf("sigma: want a positive number")
+	}
+	ha, hb := highPass(a, sigma), highPass(b, sigma)
+	var miss, energy float64
+	for i := range hb {
+		d := ha[i] - hb[i]
+		miss += d * d
+		energy += hb[i] * hb[i]
+	}
+	if energy < 1e-12 {
+		return 0, fmt.Errorf("b has no fine detail to recover")
+	}
+	return 1 - miss/energy, nil
+}
+
+// highPass is img's luma less its separable Gaussian blur, edges clamped.
+func highPass(img *image.RGBA64, sigma float64) []float64 {
+	b := img.Bounds()
+	w, h := b.Dx(), b.Dy()
+	l := make([]float64, w*h)
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			l[y*w+x] = luma(img, b.Min.X+x, b.Min.Y+y)
+		}
+	}
+	r := int(math.Ceil(3 * sigma))
+	k := make([]float64, 2*r+1)
+	var ks float64
+	for i := range k {
+		d := float64(i - r)
+		k[i] = math.Exp(-d * d / (2 * sigma * sigma))
+		ks += k[i]
+	}
+	clamp := func(v, n int) int { return min(max(v, 0), n-1) }
+	tmp, blur := make([]float64, w*h), make([]float64, w*h)
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			var s float64
+			for i, kv := range k {
+				s += kv * l[y*w+clamp(x+i-r, w)]
+			}
+			tmp[y*w+x] = s / ks
+		}
+	}
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			var s float64
+			for i, kv := range k {
+				s += kv * tmp[clamp(y+i-r, h)*w+x]
+			}
+			blur[y*w+x] = s / ks
+		}
+	}
+	for i := range l {
+		l[i] -= blur[i]
+	}
+	return l
+}

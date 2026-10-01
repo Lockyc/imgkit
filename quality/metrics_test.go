@@ -180,3 +180,51 @@ func TestStdRatioErrors(t *testing.T) {
 		t.Errorf("mismatched sizes gave %v, want an error", v)
 	}
 }
+
+func TestDetail(t *testing.T) {
+	dir := t.TempDir()
+	save := func(name string, f func(x, y int) uint8) string {
+		img := image.NewGray(image.Rect(0, 0, 48, 48))
+		for y := 0; y < 48; y++ {
+			for x := 0; x < 48; x++ {
+				img.SetGray(x, y, color.Gray{f(x, y)})
+			}
+		}
+		p := filepath.Join(dir, name)
+		raster.SavePNG(p, img)
+		return p
+	}
+	noise := func(seed int) func(x, y int) uint8 {
+		return func(x, y int) uint8 {
+			h := uint32(x*73856093 ^ y*19349663 ^ seed*83492791)
+			h ^= h >> 13
+			h *= 0x5bd1e995
+			h ^= h >> 15
+			return uint8(64 + h%128)
+		}
+	}
+	orig := save("o.png", noise(1))
+	flat := save("f.png", func(x, y int) uint8 { return 127 })
+	wrong := save("w.png", noise(2))
+	for _, c := range []struct {
+		name, a string
+		lo, hi  float64
+	}{
+		{"the original itself", orig, 1, 1},
+		{"a flat image, all detail lost", flat, -1e-9, 1e-9},
+		{"detail in the wrong places", wrong, -2, -0.1},
+	} {
+		v, err := Metrics["detail"](Params{"a": c.a, "b": orig})
+		if err != nil || v < c.lo || v > c.hi {
+			t.Errorf("%s: detail = %v, %v; want %v..%v", c.name, v, err, c.lo, c.hi)
+		}
+	}
+	if v, err := Metrics["detail"](Params{"a": orig, "b": flat}); err == nil {
+		t.Errorf("an original with no detail gave %v, want an error", v)
+	}
+	small := filepath.Join(dir, "s.png")
+	raster.SavePNG(small, image.NewGray(image.Rect(0, 0, 5, 5)))
+	if v, err := Metrics["detail"](Params{"a": small, "b": orig}); err == nil {
+		t.Errorf("mismatched sizes gave %v, want an error", v)
+	}
+}
