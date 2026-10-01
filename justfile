@@ -59,3 +59,8 @@ install:
     go install .
     bin="$(go env GOBIN)"; [ -n "$bin" ] || bin="$(go env GOPATH)/bin"
     "$bin/imgkit" version
+
+# Re-resolve every embedded ML script's lockfile (after editing a PEP 723 header)
+[group("build")]
+lock-ml:
+    for f in internal/ml/scripts/*.py; do uv lock --script "$f"; done

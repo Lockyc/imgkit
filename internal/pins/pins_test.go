@@ -91,3 +91,12 @@ func TestHint(t *testing.T) {
 		t.Error("plan9-only engine reported supported")
 	}
 }
+
+func TestMLPins(t *testing.T) {
+	if !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(ViTMatte.Revision) {
+		t.Errorf("ViTMatte revision %q is not a commit sha", ViTMatte.Revision)
+	}
+	if IOPaint.Version == "" || IOPaint.ExcludeNewer == "" {
+		t.Error("IOPaint needs a version and an exclude-newer date")
+	}
+}

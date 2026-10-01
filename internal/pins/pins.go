@@ -214,3 +214,18 @@ func fields(v string) []int {
 	}
 	return out
 }
+
+// Model is a machine-learning model an ML script downloads on first run,
+// pinned to a Hugging Face commit so a re-uploaded model cannot change a
+// result silently.
+type Model struct{ Repo, Revision string }
+
+// ViTMatte refines a coarse mask into a per-strand alpha matte.
+var ViTMatte = Model{Repo: "hustvl/vitmatte-base-composition-1k", Revision: "bf486d01a7d9e3dbcc8400f7942835caf0eaf76e"}
+
+// PyTool is an upstream Python CLI run with `uv tool run`, resolved as of
+// ExcludeNewer so its transitive dependencies cannot drift.
+type PyTool struct{ Package, Version, ExcludeNewer string }
+
+// IOPaint runs LaMa.
+var IOPaint = PyTool{Package: "iopaint", Version: "1.6.0", ExcludeNewer: "2026-10-01T00:00:00Z"}
