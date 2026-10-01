@@ -23,7 +23,7 @@ for a in "$@"; do
   esac
 done
 case "$dev" in
-  pdfwrite) printf '%%PDF-1.7 master' > "$out"; [ -n "$GS_STDERR" ] && echo "$GS_STDERR" >&2 ;;
+  pdfwrite) printf '%%PDF-1.7 master' > "$(printf '%s' "$out" | sed 's/%%/%/g')"; [ -n "$GS_STDERR" ] && echo "$GS_STDERR" >&2 ;;
   png16m)
     f=$FIXTURE_SRC_PNG
     case "$*" in *DefaultCMYKProfile*) f=$FIXTURE_OUT_PNG ;; esac
@@ -66,9 +66,9 @@ func setup(t *testing.T) *env {
 	e := &env{gs: enginetest.Stub(t, "gs", gsStub), dir: t.TempDir()}
 	enginetest.Stub(t, "pdfinfo", pdfinfoStub)
 	enginetest.Stub(t, "pdffonts", `printf 'name type encoding emb sub uni object ID\n---- ---- ---- --- --- --- ---\n%s' "$FONTS"`)
-	enginetest.Stub(t, "pdfimages", `printf 'page num type width height color comp bpc enc interp object ID x-ppi y-ppi size ratio\n----\n   1   0 image 1200 900 %s 4 8 image no 12 0 300 300 100K 2.5%%\n' "${IMG_COLOR:-cmyk}"`)
+	enginetest.Stub(t, "pdfimages", `printf 'page num type width height color comp bpc enc interp object ID x-ppi y-ppi size ratio\n----\n   1   0 %s 1200 900 %s 4 8 image no 12 0 300 300 100K 2.5%%\n' "${IMG_TYPE:-image}" "${IMG_COLOR:-cmyk}"`)
 	enginetest.Stub(t, "qpdf", `printf '%s\n' "${QDF:-/DeviceCMYK k}" > "$4"`)
-	for _, k := range []string{"GS_STDERR", "FONTS", "IMG_COLOR", "QDF", "OUT_SIZE", "PAGES", "PAGE_LINES"} {
+	for _, k := range []string{"GS_STDERR", "FONTS", "IMG_TYPE", "IMG_COLOR", "QDF", "OUT_SIZE", "PAGES", "PAGE_LINES"} {
 		t.Setenv(k, "")
 	}
 	src := grey(t, nil)
@@ -132,6 +132,39 @@ func TestPressFailures(t *testing.T) {
 				t.Error("a failed master was left behind")
 			}
 		})
+	}
+}
+
+func TestPressAcceptsStencilMasks(t *testing.T) {
+	e := setup(t)
+	t.Setenv("IMG_TYPE", "stencil")
+	t.Setenv("IMG_COLOR", "-")
+	if code := e.run(); code != 0 {
+		t.Fatalf("code %d: %s", code, e.stderr.String())
+	}
+}
+
+func TestPressSkipsImageData(t *testing.T) {
+	e := setup(t)
+	t.Setenv("QDF", "1 0 obj\n<< /Type /XObject /Subtype /Image /ColorSpace /DeviceCMYK >>\nstream\n rg\n RG\nendstream\nendobj\n2 0 obj\n<< /Length 3 >>\nstream\n0 0 0 1 k\nendstream\nendobj")
+	if code := e.run(); code != 0 {
+		t.Fatalf("code %d: %s", code, e.stderr.String())
+	}
+	e = setup(t)
+	t.Setenv("QDF", "2 0 obj\n<< /Length 3 >>\nstream\n0.2 0.3 0.4 rg\nendstream\nendobj")
+	if code := e.run(); code != 1 || !strings.Contains(e.stderr.String(), "non-CMYK colour") {
+		t.Fatalf("content-stream rg passed: code %d: %s", code, e.stderr.String())
+	}
+}
+
+func TestPressEscapesTheOutputName(t *testing.T) {
+	e := setup(t)
+	e.out = filepath.Join(e.dir, "out%d.pdf")
+	if code := e.run(); code != 0 {
+		t.Fatalf("code %d: %s", code, e.stderr.String())
+	}
+	if !slices.Contains(enginetest.Calls(t, e.gs)[0], "-sOutputFile="+filepath.Join(e.dir, "out%%d.pdf")) {
+		t.Errorf("args %q", enginetest.Calls(t, e.gs)[0])
 	}
 }
 

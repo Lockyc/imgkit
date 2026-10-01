@@ -86,7 +86,6 @@ func isNumber(s string) bool {
 	return ok
 }
 
-
 type job struct {
 	in, out, coarse         string
 	height, tile, bin, bout int

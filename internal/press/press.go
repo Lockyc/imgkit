@@ -9,6 +9,7 @@
 package press
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -39,7 +40,8 @@ const defaultMaxRMSE = 0.085
 const gsTimeout = 30 * time.Minute
 
 // nonCMYK matches every colour space and RGB fill/stroke operator that may
-// not appear in a master, in qpdf's uncompressed QDF form.
+// not appear in a master, in qpdf's uncompressed QDF form, read without its
+// image data (see withoutImageData).
 var nonCMYK = regexp.MustCompile(`(?m)/(DeviceRGB|CalRGB|ICCBased|Lab|Indexed|Separation|DeviceN)\b| (rg|RG)$`)
 
 type region struct {
@@ -171,12 +173,45 @@ func (j job) run(ctx context.Context) (err error) {
 		"-dColorImageResolution=" + ppi, "-dGrayImageResolution=" + ppi,
 		"-dColorImageDownsampleThreshold=1.5", "-dGrayImageDownsampleThreshold=1.5",
 		"-dDownsampleMonoImages=false",
-		"-sOutputFile=" + j.out, j.in}
+		"-sOutputFile=" + gsLiteral(j.out), j.in}
 	if _, err := engine.Run(ctx, engine.Cmd{Engine: "gs", Args: args, StderrFatal: true, Inputs: []string{j.in, j.icc}, Outputs: []string{j.out}, Timeout: gsTimeout}); err != nil {
 		return err
 	}
 	return j.verify(ctx, src)
 }
+
+// gsLiteral escapes a path for -sOutputFile, where Ghostscript reads %d
+// and its kin as a page-number template.
+func gsLiteral(path string) string { return strings.ReplaceAll(path, "%", "%%") }
+
+// withoutImageData is a QDF file with the data of every image stream cut
+// out: press stores images Flate-encoded and QDF decodes them, so their
+// pixel bytes would otherwise be scanned as if they were page content.
+func withoutImageData(qdf []byte) []byte {
+	var out []byte
+	for {
+		i := bytes.Index(qdf, []byte("\nstream\n"))
+		if i < 0 {
+			return append(out, qdf...)
+		}
+		head := i + len("\nstream\n")
+		out = append(out, qdf[:head]...)
+		dict := qdf[:i]
+		if o := bytes.LastIndex(dict, []byte(" obj\n")); o >= 0 {
+			dict = dict[o:]
+		}
+		end := bytes.Index(qdf[head:], []byte("\nendstream"))
+		if end < 0 {
+			return out
+		}
+		if !imageDict.Match(dict) {
+			out = append(out, qdf[head:head+end]...)
+		}
+		qdf = qdf[head+end:]
+	}
+}
+
+var imageDict = regexp.MustCompile(`/Subtype\s*/Image\b`)
 
 func tableRows(out []byte) []string {
 	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
@@ -204,7 +239,9 @@ func (j job) verify(ctx context.Context, src pdf.Info) error {
 	var bad []string
 	for _, row := range tableRows(res.Stdout) {
 		f := strings.Fields(row)
-		if len(f) < 6 || (f[5] != "cmyk" && f[5] != "gray") {
+		// A stencil mask (an /ImageMask) has no colour space of its own: it
+		// paints in the fill colour, which the operator scan below checks.
+		if len(f) < 6 || (f[2] != "stencil" && f[5] != "cmyk" && f[5] != "gray") {
 			bad = append(bad, row)
 		}
 	}
@@ -225,7 +262,7 @@ func (j job) verify(ctx context.Context, src pdf.Info) error {
 		return err
 	}
 	var spaces []string
-	for _, m := range nonCMYK.FindAll(b, -1) {
+	for _, m := range nonCMYK.FindAll(withoutImageData(b), -1) {
 		s := strings.TrimSpace(string(m))
 		if !slices.Contains(spaces, s) {
 			spaces = append(spaces, s)
@@ -258,21 +295,21 @@ func (j job) verify(ctx context.Context, src pdf.Info) error {
 func (j job) proof(ctx context.Context, tmp string, src pdf.Info) error {
 	dpi := pt(float64(j.proofWidth) * 72 / src.W)
 	common := []string{"-q", "-dBATCH", "-dNOPAUSE", "-dSAFER", "-sDEVICE=png16m", "-r" + dpi, "-dTextAlphaBits=4", "-dGraphicsAlphaBits=4"}
-	srcPat, outPat := filepath.Join(tmp, "src-%d.png"), filepath.Join(tmp, "out-%d.png")
-	first := func(pat string) []string { return []string{strings.Replace(pat, "%d", "1", 1)} }
-	if _, err := engine.Run(ctx, engine.Cmd{Engine: "gs", Args: append(common, "-sOutputFile="+srcPat, j.in), StderrFatal: true, Inputs: []string{j.in}, Outputs: first(srcPat), Timeout: gsTimeout}); err != nil {
+	page := func(name string, p int) string { return filepath.Join(tmp, name+"-"+strconv.Itoa(p)+".png") }
+	pattern := func(name string) string { return gsLiteral(tmp) + string(filepath.Separator) + name + "-%d.png" }
+	if _, err := engine.Run(ctx, engine.Cmd{Engine: "gs", Args: append(common, "-sOutputFile="+pattern("src"), j.in), StderrFatal: true, Inputs: []string{j.in}, Outputs: []string{page("src", 1)}, Timeout: gsTimeout}); err != nil {
 		return err
 	}
-	outArgs := append(common, "--permit-file-read="+j.icc, "-sDefaultCMYKProfile="+j.icc, "-dRenderIntent=1", "-dBlackPtComp=1", "-sOutputFile="+outPat, j.out)
-	if _, err := engine.Run(ctx, engine.Cmd{Engine: "gs", Args: outArgs, StderrFatal: true, Inputs: []string{j.out, j.icc}, Outputs: first(outPat), Timeout: gsTimeout}); err != nil {
+	outArgs := append(common, "--permit-file-read="+j.icc, "-sDefaultCMYKProfile="+j.icc, "-dRenderIntent=1", "-dBlackPtComp=1", "-sOutputFile="+pattern("out"), j.out)
+	if _, err := engine.Run(ctx, engine.Cmd{Engine: "gs", Args: outArgs, StderrFatal: true, Inputs: []string{j.out, j.icc}, Outputs: []string{page("out", 1)}, Timeout: gsTimeout}); err != nil {
 		return err
 	}
 	for p := 1; p <= src.Pages; p++ {
-		a, err := raster.Load(strings.Replace(srcPat, "%d", strconv.Itoa(p), 1))
+		a, err := raster.Load(page("src", p))
 		if err != nil {
 			return err
 		}
-		b, err := raster.Load(strings.Replace(outPat, "%d", strconv.Itoa(p), 1))
+		b, err := raster.Load(page("out", p))
 		if err != nil {
 			return err
 		}
