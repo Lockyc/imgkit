@@ -4,6 +4,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -50,7 +51,7 @@ func TestParseFrac(t *testing.T) {
 	if err != nil || f != (Frac{0, 0.88, 1, 0.12}) {
 		t.Fatalf("ParseFrac = %v, %v", f, err)
 	}
-	for _, bad := range []string{"", "1,2,3", "0,0,1.5,1", "a,b,c,d", "-0.1,0,1,1"} {
+	for _, bad := range []string{"", "1,2,3", "0,0,1.5,1", "a,b,c,d", "-0.1,0,1,1", "NaN,0,1,1"} {
 		if _, err := ParseFrac(bad); err == nil {
 			t.Errorf("ParseFrac(%q) accepted", bad)
 		}
@@ -73,5 +74,24 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	}
 	if v, _ := RMSE(src, got, src.Bounds(), RGB); v > 1e-3 {
 		t.Errorf("round trip RMSE %v", v)
+	}
+}
+
+func TestSavePNGFailureLeavesNoFile(t *testing.T) {
+	dir := t.TempDir()
+	fresh, existing := filepath.Join(dir, "fresh.png"), filepath.Join(dir, "old.png")
+	os.WriteFile(existing, []byte("old"), 0o644)
+	empty := image.NewRGBA64(image.Rect(0, 0, 0, 0)) // png.Encode rejects a zero-size image
+	for _, p := range []string{fresh, existing} {
+		if err := SavePNG(p, empty); err == nil {
+			t.Fatalf("SavePNG(%s) encoded an empty image", p)
+		}
+	}
+	if b, _ := os.ReadFile(existing); string(b) != "old" {
+		t.Errorf("existing file = %q, want it untouched", b)
+	}
+	entries, _ := os.ReadDir(dir)
+	if len(entries) != 1 {
+		t.Errorf("dir holds %d entries, want only old.png", len(entries))
 	}
 }

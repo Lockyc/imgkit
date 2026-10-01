@@ -12,6 +12,7 @@ import (
 	"image/png"
 	"math"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -33,17 +34,29 @@ func Load(path string) (*image.RGBA64, error) {
 	return dst, nil
 }
 
-// SavePNG writes img as PNG.
+// SavePNG writes img as PNG, mode 0644. It encodes into a temporary file
+// beside path and renames it into place, so a failed save leaves path as
+// it was rather than truncated.
 func SavePNG(path string, img image.Image) error {
-	f, err := os.Create(path)
+	f, err := os.CreateTemp(filepath.Dir(path), ".imgkit-*.png")
 	if err != nil {
 		return err
 	}
-	if err := png.Encode(f, img); err != nil {
-		f.Close()
-		return err
+	tmp := f.Name()
+	err = png.Encode(f, img)
+	if err == nil {
+		err = f.Chmod(0o644)
 	}
-	return f.Close()
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Rename(tmp, path)
+	}
+	if err != nil {
+		os.Remove(tmp)
+	}
+	return err
 }
 
 // Frac is a rectangle as fractions of an image's width and height, so one
@@ -59,7 +72,7 @@ func ParseFrac(s string) (Frac, error) {
 	var v [4]float64
 	for i, p := range parts {
 		n, err := strconv.ParseFloat(strings.TrimSpace(p), 64)
-		if err != nil || n < 0 || n > 1 {
+		if err != nil || math.IsNaN(n) || n < 0 || n > 1 {
 			return Frac{}, fmt.Errorf("region %q: %q is not a fraction between 0 and 1", s, p)
 		}
 		v[i] = n
