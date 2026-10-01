@@ -15,31 +15,37 @@
 """matte.py -- refine a coarse mask into a hair-level alpha matte.
 
     matte.py --image frame.png --coarse mask.png --out out.png --model REPO --revision SHA
-             [--band-in 60] [--band-out 40] [--tile 1024] [--overlap 128]
+             [--context-height 1024] [--band-in 12] [--band-out 40] [--tile 1024] [--overlap 128]
              [--despill-hue 70:100 --despill-hue-end 200 --despill-chroma 6:40
               --despill-lmax 88 --despill-clean 15:65]
 
-1. trimap: the coarse mask eroded by height/band-in is sure foreground, and
-   beyond it dilated by height/band-out is sure background. The band is wide
-   because background seen between strands lies well inside the coarse
-   silhouette: a narrow band never reaches it and the fringe stays.
-2. alpha: ViTMatte predicts alpha over the unknown band at full resolution,
+1. context: a coarse mask swallows background seen through hair, sometimes
+   deep inside its silhouette, so the band must be wide: the mask eroded by
+   height/band-in is sure foreground, and beyond it dilated by
+   height/band-out is sure background. ViTMatte solves that band in one
+   whole-frame pass at --context-height, where it sees the whole subject.
+   On full-resolution tiles the same wide band turns solid parts that
+   resemble the background (a grey sleeve over pale bark) see-through.
+2. trimap: the context alpha, thresholded at 0.5, replaces the coarse mask.
+   It eroded by height/REFINE_IN_DIV is sure foreground, beyond it dilated by
+   height/band-out is sure background, and the context's soft pixels, grown
+   by height/SOFT_DIV, are unknown.
+3. alpha: ViTMatte predicts alpha over the unknown band at full resolution,
    on tile-px tiles overlapping by overlap px, blended with a linear ramp,
    and only on tiles with unknown pixels. The network's global attention
    scales with the square of the token count: a whole 2400 px frame needs
    about 27 GB. A tile needs a few hundred MB, and the result stays within
    1% RMSE of the whole frame with no seam. --tile 0 runs the whole frame.
-3. colour: pymatting's multilevel foreground estimation un-mixes each
+4. colour: pymatting's multilevel foreground estimation un-mixes each
    partly transparent pixel toward its foreground colour, removing the
    background tint the camera recorded through the hair. Alpha is untouched.
-4. despill (only with --despill-hue): where thin strands lie over the
+5. despill (only with --despill-hue): where thin strands lie over the
    background, the matte rightly keeps the pixel opaque and its colour is a
    mix. Near the silhouette, pixels whose Lab hue has drifted from the
    subject's toward the background's, at modest chroma and below --lmax,
    have their chroma pulled toward the alpha-weighted local average of clean
    subject pixels (hue within --despill-clean). Lightness and alpha are
-   untouched. Widening the trimap inward instead scored 0.26% and thinned
-   the hair; this scored 0.04% with the edge intact.
+   untouched.
 
 Every step segments or un-mixes pixels the camera captured. None invents one.
 """
@@ -56,6 +62,8 @@ from PIL import Image
 from pymatting import estimate_foreground_ml
 from transformers import VitMatteForImageMatting, VitMatteImageProcessor
 
+REFINE_IN_DIV = 60
+SOFT_DIV = 50
 DESPILL_OUT_DIV = 40
 DESPILL_IN_DIV = 25
 DESPILL_REF_DIV = 120
@@ -73,7 +81,8 @@ def main() -> None:
     ap.add_argument("--out", required=True)
     ap.add_argument("--model", required=True)
     ap.add_argument("--revision", required=True)
-    ap.add_argument("--band-in", type=int, default=60)
+    ap.add_argument("--context-height", type=int, default=1024)
+    ap.add_argument("--band-in", type=int, default=12)
     ap.add_argument("--band-out", type=int, default=40)
     ap.add_argument("--tile", type=int, default=1024)
     ap.add_argument("--overlap", type=int, default=128)
@@ -95,19 +104,22 @@ def main() -> None:
         sys.exit(f"matte: mask {coarse.shape[::-1]} does not match image {img.size}")
 
     h = img.height
-    mask = (coarse > 127).astype(np.uint8) * 255
-    k = lambda r: cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
-    sure_fg = cv2.erode(mask, k(max(1, h // a.band_in)))
-    sure_bg = cv2.dilate(mask, k(max(1, h // a.band_out)))
-    trimap = np.full(mask.shape, 128, np.uint8)
-    trimap[sure_fg > 0] = 255
-    trimap[sure_bg == 0] = 0
-
     device = "mps" if torch.backends.mps.is_available() else "cpu"
     processor = VitMatteImageProcessor.from_pretrained(a.model, revision=a.revision)
     model = VitMatteForImageMatting.from_pretrained(a.model, revision=a.revision).to(device).eval()
     t0 = time.time()
-    alpha, tiles = matte_tiled(img, trimap, processor, model, device, a.tile, a.overlap)
+
+    ch = min(a.context_height, h)
+    small = img.resize((round(img.width * ch / h), ch), Image.LANCZOS) if ch != h else img
+    coarse_small = cv2.resize(coarse, small.size, interpolation=cv2.INTER_AREA)
+    context, _ = matte_tiled(small, trimap(binary(coarse_small), ch, a.band_in, a.band_out), processor, model, device, 0, 0)
+    context = cv2.resize(context, img.size, interpolation=cv2.INTER_LINEAR)
+
+    mask = binary((context * 255).round().astype(np.uint8))
+    tri = trimap(mask, h, REFINE_IN_DIV, a.band_out)
+    soft = ((context > 0.02) & (context < 0.98)).astype(np.uint8)
+    tri[cv2.dilate(soft, disc(max(1, h // SOFT_DIV))) > 0] = 128
+    alpha, tiles = matte_tiled(img, tri, processor, model, device, a.tile, a.overlap)
 
     rgb = np.asarray(img).astype(np.float64) / 255.0
     fg = np.clip(estimate_foreground_ml(rgb, alpha), 0.0, 1.0)
@@ -127,9 +139,25 @@ def main() -> None:
     os._exit(0)
 
 
+def disc(r: int) -> np.ndarray:
+    return cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
+
+
+def binary(mask8: np.ndarray) -> np.ndarray:
+    return (mask8 > 127).astype(np.uint8) * 255
+
+
+def trimap(mask: np.ndarray, h: int, band_in: int, band_out: int) -> np.ndarray:
+    """mask eroded by h/band_in is sure foreground (255), beyond it dilated by
+    h/band_out is sure background (0), and the band between is unknown (128)."""
+    t = np.full(mask.shape, 128, np.uint8)
+    t[cv2.erode(mask, disc(max(1, h // band_in))) > 0] = 255
+    t[cv2.dilate(mask, disc(max(1, h // band_out))) == 0] = 0
+    return t
+
+
 def despill(rgb8, alpha, mask, h, a):
-    k = lambda r: cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
-    zone = (cv2.dilate(mask, k(h // DESPILL_OUT_DIV)) > 0) & (cv2.erode(mask, k(h // DESPILL_IN_DIV)) == 0)
+    zone = (cv2.dilate(mask, disc(h // DESPILL_OUT_DIV)) > 0) & (cv2.erode(mask, disc(h // DESPILL_IN_DIV)) == 0)
     lab = cv2.cvtColor(rgb8, cv2.COLOR_RGB2LAB).astype(np.float32)
     L, A, B = lab[..., 0] * 100.0 / 255.0, lab[..., 1] - 128.0, lab[..., 2] - 128.0
     hue = np.degrees(np.arctan2(B, A)) % 360.0

@@ -77,7 +77,9 @@ colours, or renders what it is given.
 ## Operations
 
 - **cutout** — a coarse mask (`--coarse vision`, the default on macOS, or
-  `birefnet`), then ViTMatte refinement from a trimap, run in 1024 px tiles
+  `birefnet`), then ViTMatte twice: over a wide band in one whole-frame pass
+  at 1024 px, which re-solves background the mask swallowed behind hair, then
+  over a narrow band around that result at full resolution, in 1024 px tiles
   overlapping by 128 px so memory stays near 1 GB at any size. Then the
   foreground colour is estimated so soft edges lose the background's tint.
   An optional despill pulls a named contaminating hue toward the local clean

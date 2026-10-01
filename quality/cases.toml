@@ -132,6 +132,22 @@ params = { image = "{tmp:cut.png}", region = "0.17,0,0.57,0.58", bg = "#062d5f" 
 max    = 0.000089
 
 [[case]]
+name   = "cutout-sleeve-not-seethrough"
+why    = "a trimap band wide enough to reach background deep inside the coarse mask turned a grey sleeve over pale bark 24% see-through on full-resolution tiles"
+run    = ["cutout", "{asset:portrait-foliage.jpg}", "{tmp:cut.png}"]
+metric = "seethrough"
+params = { image = "{tmp:cut.png}", solid = "0.183,0.547 0.243,0.457 0.283,0.415 0.298,0.427 0.258,0.487 0.258,0.554 0.313,0.607 0.353,0.712 0.363,0.832 0.298,0.839 0.338,0.689 0.273,0.629 0.193,0.577" }
+max    = 0.001
+
+[[case]]
+name   = "cutout-dress-not-seethrough"
+why    = "a silver-green dress and bare arm in front of ivy must stay opaque when the band reaches deep into the coarse mask"
+run    = ["cutout", "{asset:portrait-ivy.jpg}", "{tmp:cut.png}"]
+metric = "seethrough"
+params = { image = "{tmp:cut.png}", solid = "0.18,0.66 0.23,0.60 0.30,0.62 0.47,0.62 0.62,0.72 0.70,0.78 0.74,0.98 0.20,0.98 0.17,0.82" }
+max    = 0.001
+
+[[case]]
 name   = "cutout-fur-not-seethrough"
 why    = "fur over a similar-coloured ground came out see-through with several models"
 run    = ["cutout", "--coarse", "birefnet", "{asset:fur-matching-ground.jpg}", "{tmp:cut.png}"]

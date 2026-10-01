@@ -1,6 +1,7 @@
 // Package cutout lifts the subject out of an image as RGBA at the source's
 // framing: a coarse mask (Apple Vision or BiRefNet) as the prior, ViTMatte
-// solving the edge at full resolution in tiles, foreground estimation to
+// re-solving a wide band of it over the whole frame at contextHeight and
+// then the edge at full resolution in tiles, foreground estimation to
 // lift the background's tint out of soft edges, and an optional despill.
 // Every step computes alpha or un-mixes captured colour, so cutout is not
 // a synthesising command. The output is PNG: a soft matte edge is exactly
@@ -31,6 +32,12 @@ const usage = "cutout [--coarse vision|birefnet] [--height PX] [--tile PX] [--ba
 // overlap is how far adjacent ViTMatte tiles overlap, in px. A tile must be
 // larger than it, or the tiles never advance across the frame.
 const overlap = 128
+
+// contextHeight is the height, in px, of the whole-frame ViTMatte pass that
+// re-solves the coarse mask before the full-resolution pass. Whole-frame
+// ViTMatte memory grows with the fourth power of height; at 1024 px it needs
+// about as much as one 1024 px tile.
+const contextHeight = 1024
 
 // despill is one full set of despill values: matte.py despills only with
 // all five, and has no defaults of its own.
@@ -76,7 +83,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	coarse := fs.String("coarse", defaultCoarse(), "coarse mask: vision (macOS) or birefnet")
 	height := fs.Int("height", 0, "working height in px, never above the source; at least the largest size the cut-out will be drawn at (0 = source height)")
 	tile := fs.Int("tile", 1024, fmt.Sprintf("ViTMatte tile size in px, above the %d px overlap; 0 runs the whole frame (memory grows with the fourth power of height)", overlap))
-	bin := fs.Int("band-in", 60, "sure foreground: the coarse mask eroded by height/D")
+	bin := fs.Int("band-in", 12, "sure foreground of the context pass: the coarse mask eroded by height/D; lower it when the coarse mask swallows background deeper behind hair or fur")
 	bout := fs.Int("band-out", 40, "sure background: beyond the coarse mask dilated by height/D")
 	preset := fs.String("despill", "", "despill preset: warm-on-green; the --despill-* flags override its values")
 	hue := fs.String("despill-hue", "", "contamination ramp in Lab hue degrees, A:B; without a preset, despill needs all five --despill-* flags")
@@ -196,7 +203,7 @@ func (j job) run(ctx context.Context) (int, int, error) {
 	}
 	args := []string{"--image", frame, "--coarse", mask, "--out", j.out,
 		"--model", pins.ViTMatte.Repo, "--revision", pins.ViTMatte.Revision,
-		"--band-in", strconv.Itoa(j.bin), "--band-out", strconv.Itoa(j.bout),
+		"--context-height", strconv.Itoa(contextHeight), "--band-in", strconv.Itoa(j.bin), "--band-out", strconv.Itoa(j.bout),
 		"--tile", strconv.Itoa(j.tile), "--overlap", strconv.Itoa(overlap)}
 	if d := j.despill; d.hue != "" {
 		args = append(args, "--despill-hue", d.hue, "--despill-clean", d.clean, "--despill-chroma", d.chroma,

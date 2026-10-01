@@ -79,7 +79,7 @@ func TestCutoutBirefnet(t *testing.T) {
 		t.Fatalf("code %d: %s", code, e.stderr.String())
 	}
 	matte := matteCall(t, e)
-	wantFlags(t, matte, map[string]string{"--model": pins.ViTMatte.Repo, "--revision": pins.ViTMatte.Revision, "--tile": "1024", "--overlap": strconv.Itoa(overlap), "--band-in": "60", "--band-out": "40"})
+	wantFlags(t, matte, map[string]string{"--model": pins.ViTMatte.Repo, "--revision": pins.ViTMatte.Revision, "--tile": "1024", "--overlap": strconv.Itoa(overlap), "--context-height": strconv.Itoa(contextHeight), "--band-in": "12", "--band-out": "40"})
 	for _, a := range matte {
 		if strings.HasPrefix(a, "--despill") {
 			t.Errorf("despill ran without being asked for: %q", matte)
