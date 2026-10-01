@@ -114,3 +114,106 @@ run    = ["grade", "apply", "--clut", "{tmp:id.png}", "{tmp:in.png}", "{tmp:out.
 metric = "rmse"
 params = { a = "{tmp:in.png}", b = "{tmp:out.png}", channels = "alpha" }
 max    = 0.0
+
+[[case]]
+name   = "cutout-hair-over-foliage"
+why    = "a hard coarse mask keeps foliage between hair strands; composited on navy it reads as a green fringe"
+run    = ["cutout", "{asset:portrait-foliage.jpg}", "{tmp:cut.png}"]
+metric = "green-fringe"
+params = { image = "{tmp:cut.png}", region = "0.27,0.27,0.47,0.45", bg = "#062d5f" }
+max    = 1.0
+
+[[case]]
+name   = "cutout-hair-over-foliage-birefnet"
+why    = "the Linux default coarse mask must reach the same edge quality"
+run    = ["cutout", "--coarse", "birefnet", "{asset:portrait-foliage.jpg}", "{tmp:cut.png}"]
+metric = "green-fringe"
+params = { image = "{tmp:cut.png}", region = "0.27,0.27,0.47,0.45", bg = "#062d5f" }
+max    = 1.0
+
+[[case]]
+name   = "cutout-fur-not-seethrough"
+why    = "fur over a similar-coloured ground came out see-through with several models"
+run    = ["cutout", "--coarse", "birefnet", "{asset:fur-matching-ground.jpg}", "{tmp:cut.png}"]
+metric = "seethrough"
+params = { image = "{tmp:cut.png}", solid = "0.45,0.40 0.62,0.36 0.84,0.48 0.84,0.82 0.70,0.88 0.52,0.80 0.45,0.58" }
+max    = 1.0
+
+[[case]]
+name   = "cutout-tiles-match-whole-frame"
+why    = "tiling ViTMatte must not change the matte or leave a seam"
+setup  = [["magick", "{asset:portrait-foliage.jpg}", "-resize", "x1400", "{tmp:small.jpg}"]]
+run    = ["cutout", "--tile", "1024", "{tmp:small.jpg}", "{tmp:tiled.png}"]
+post   = [["imgkit", "cutout", "--tile", "0", "{tmp:small.jpg}", "{tmp:whole.png}"]]
+metric = "rmse"
+params = { a = "{tmp:tiled.png}", b = "{tmp:whole.png}", channels = "alpha" }
+max    = 0.01
+
+[[case]]
+name   = "cutout-refuses-upsample"
+why    = "an upsampled cut-out is the artefact print cannot hide"
+run    = ["cutout", "--height", "99999", "{asset:portrait-foliage.jpg}", "{tmp:cut.png}"]
+exit   = 1
+stderr = "never upsampled"
+absent = ["{tmp:cut.png}"]
+
+[[case]]
+name   = "cutout-no-foreground"
+why    = "a frame with no subject must fail, not produce an empty or random matte"
+setup  = [["magick", "-size", "800x600", "xc:#7f7f7f", "{tmp:flat.png}"]]
+run    = ["cutout", "--coarse", "birefnet", "{tmp:flat.png}", "{tmp:cut.png}"]
+exit   = 1
+stderr = "no foreground"
+absent = ["{tmp:cut.png}"]
+
+[[case]]
+name   = "infill-texture"
+why    = "a filled hole must not be flatter than the ground around it"
+setup  = [["magick", "-size", "1521x1521", "xc:black", "-fill", "white", "-draw", "circle 760,760 760,610", "{tmp:mask.png}"]]
+run    = ["infill", "--mask", "{tmp:mask.png}", "{asset:flat-ground.jpg}", "{tmp:out.png}"]
+metric = "std-ratio"
+params = { a = "{tmp:out.png}", b = "{asset:flat-ground.jpg}", mask = "{tmp:mask.png}", ring = 40 }
+min    = 0.0
+
+[[case]]
+name   = "inpaint-texture"
+why    = "LaMa must reconstruct a textured hole close to the original"
+setup  = [["magick", "-size", "2000x1330", "xc:black", "-fill", "white", "-draw", "circle 1000,665 1000,545", "{tmp:mask.png}"]]
+run    = ["inpaint", "--mask", "{tmp:mask.png}", "{asset:detail-photo.jpg}", "{tmp:out.png}"]
+metric = "rmse"
+params = { a = "{tmp:out.png}", b = "{asset:detail-photo.jpg}", mask = "{tmp:mask.png}" }
+max    = 1.0
+
+[[case]]
+name   = "synthesis-forbidden"
+why    = "a project that forbids synthesis must never get synthesised pixels"
+files  = { "imgkit.toml" = 'synthesis = "forbid"' }
+setup  = [["magick", "-size", "64x64", "xc:white", "{tmp:m.png}"]]
+run    = ["infill", "--mask", "{tmp:m.png}", "{tmp:m.png}", "{tmp:out.png}"]
+exit   = 1
+stderr = "synthesis = \"forbid\""
+absent = ["{tmp:out.png}"]
+
+[[case]]
+name   = "upscale-beats-resampling"
+why    = "Real-ESRGAN must recover a 4x-reduced photo closer than plain resampling does"
+setup  = [["magick", "{asset:detail-photo.jpg}", "-resize", "25%", "{tmp:small.png}"]]
+run    = ["upscale", "{tmp:small.png}", "{tmp:up.png}"]
+post   = [["magick", "{tmp:up.png}", "-resize", "2000x1330!", "{tmp:up-fit.png}"], ["magick", "{asset:detail-photo.jpg}", "{tmp:orig.png}"]]
+metric = "rmse"
+params = { a = "{tmp:up-fit.png}", b = "{tmp:orig.png}" }
+max    = 1.0
+
+[[case]]
+name   = "grade-fit-recovers-treatment"
+why    = "fit must recover a known colour treatment from a shifted, scaled reference"
+setup  = [
+  ["magick", "{asset:detail-photo.jpg}", "-resize", "x1200", "(", "+clone", "-fill", "black", "-colorize", "100", "-fill", "white", "-draw", "ellipse %[fx:w/2],%[fx:h/2] %[fx:w/3],%[fx:h/2.3] 0,360", ")", "-alpha", "off", "-compose", "CopyOpacity", "-composite", "{tmp:subject.png}"],
+  ["magick", "{tmp:subject.png}", "-modulate", "96,118,98", "-level", "3%,97%", "{tmp:truth.png}"],
+  ["magick", "{tmp:truth.png}", "-background", "#ddd", "-flatten", "-resize", "85%", "-gravity", "center", "-extent", "150%x120%", "{tmp:ref.png}"],
+]
+run    = ["grade", "fit", "--ref", "{tmp:ref.png}", "{tmp:subject.png}", "{tmp:hald.png}"]
+post   = [["imgkit", "grade", "apply", "--clut", "{tmp:hald.png}", "{tmp:subject.png}", "{tmp:graded.png}"]]
+metric = "rmse"
+params = { a = "{tmp:graded.png}", b = "{tmp:truth.png}", region = "0.25,0.25,0.5,0.5" }
+max    = 1.0
