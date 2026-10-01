@@ -26,7 +26,7 @@ type Options struct {
 // colour type, since magick otherwise keeps a grey or palette source as grey
 // or palette.
 func Args(in, out, srgb string, o Options) []string {
-	a := append(oriented(in), "-profile", srgb, "-strip")
+	a := append(SRGBArgs(in, srgb), "-strip")
 	if o.Height > 0 {
 		a = append(a, "-resize", "x"+strconv.Itoa(o.Height))
 	}
@@ -37,6 +37,12 @@ func Args(in, out, srgb string, o Options) []string {
 	}
 	return append(a, "-depth", "8", format+out)
 }
+
+// SRGBArgs reads in upright and converted to the sRGB profile at srgb, its
+// depth, alpha and colour type kept: the prefix Args builds on, for an
+// operation that must see the colours a frame sees but keep the rest. A grey
+// source with an embedded grey profile converts correctly.
+func SRGBArgs(in, srgb string) []string { return append(oriented(in), "-profile", srgb) }
 
 // Write writes in's frame to out, a PNG.
 func Write(ctx context.Context, in, out string, o Options) error {

@@ -49,3 +49,9 @@ func TestOrient(t *testing.T) {
 		t.Errorf("call %q", c)
 	}
 }
+
+func TestSRGBArgs(t *testing.T) {
+	if got, want := SRGBArgs("in.jpg", "s.icc"), []string{"in.jpg", "-auto-orient", "-profile", "s.icc"}; !slices.Equal(got, want) {
+		t.Errorf("args %q, want %q", got, want)
+	}
+}

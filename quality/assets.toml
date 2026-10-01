@@ -74,3 +74,17 @@ author  = "David Revoy"
 licence = "CC BY 4.0"
 recipe  = "resized by imgkit: magick SOURCE -resize 2000x2000 -quality 92 -strip illustration.jpg"
 sha256  = "70c2c1542845343e5847779d9f7f340b093849c9e2693b469ce9b7073bf11d91"
+
+[[asset]]
+file    = "DisplayP3-v4.icc"
+source  = "https://github.com/saucecontrol/Compact-ICC-Profiles/blob/master/profiles/DisplayP3-v4.icc"
+author  = "Clinton Ingram (Compact-ICC-Profiles)"
+licence = "CC0"
+sha256  = "cb51de38e482ee974c0c76b9689e16aad04bad16e226fed2f30c842d15ff3a3d"
+
+[[asset]]
+file    = "sRGB-v4.icc"
+source  = "https://github.com/saucecontrol/Compact-ICC-Profiles/blob/master/profiles/sRGB-v4.icc"
+author  = "Clinton Ingram (Compact-ICC-Profiles)"
+licence = "CC0"
+sha256  = "c56e1685d888f5edb92fe07f2750f387f8fe8e91b32ff8fb0b56bfbbb9458353"

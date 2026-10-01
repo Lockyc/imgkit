@@ -113,7 +113,8 @@ colours, or renders what it is given.
   by RMSE over the page and any `--region`.
 - **grade** — `fit` registers the image to the reference (SIFT + RANSAC),
   fits an RGB→RGB thin-plate map on opaque, eroded pixels, and bakes a 16-bit
-  HALD CLUT. `apply` runs the CLUT through ImageMagick and restores alpha,
+  HALD CLUT from sRGB frames. `apply` reads the source upright in sRGB too,
+  keeping its depth, runs the CLUT through ImageMagick and restores alpha,
   which `-hald-clut` drops.
 - **diff** — crops both images to their overlap, searches a vertical shift,
   and scores the share of pixels whose per-channel difference has a luma above

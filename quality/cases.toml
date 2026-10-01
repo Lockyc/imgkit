@@ -116,6 +116,19 @@ params = { a = "{tmp:in.png}", b = "{tmp:out.png}", channels = "alpha" }
 max    = 0.0
 
 [[case]]
+name   = "grade-apply-converts-to-srgb"
+why    = "fit builds its table from sRGB frames; apply must read a Display P3 source in sRGB too, keeping its 16 bits and alpha, or the table meets P3 values"
+setup  = [
+  ["magick", "-size", "600x400", "gradient:red-blue", "(", "-size", "400x600", "gradient:lime-black", "-rotate", "90", ")", "-compose", "Blend", "-define", "compose:args=50", "-composite", "(", "-size", "600x400", "xc:black", "-fill", "white", "-draw", "circle 300,200 300,20", "-blur", "0x6", ")", "-alpha", "off", "-compose", "CopyOpacity", "-composite", "-depth", "16", "-profile", "{asset:DisplayP3-v4.icc}", "{tmp:in.png}"],
+  ["magick", "{tmp:in.png}", "-profile", "{asset:sRGB-v4.icc}", "{tmp:truth.png}"],
+  ["magick", "hald:8", "{tmp:id.png}"],
+]
+run    = ["grade", "apply", "--clut", "{tmp:id.png}", "{tmp:in.png}", "{tmp:out.png}"]
+metric = "rmse"
+params = { a = "{tmp:out.png}", b = "{tmp:truth.png}" }
+max    = 0.0005
+
+[[case]]
 name   = "cutout-hair-over-foliage"
 why    = "the coarse mask swallows ivy behind flyaway hair, deep enough that a narrow trimap band marks it sure subject; composited on navy it reads as a green fringe"
 run    = ["cutout", "{asset:portrait-ivy.jpg}", "{tmp:cut.png}"]

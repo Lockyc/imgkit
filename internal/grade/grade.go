@@ -1,7 +1,9 @@
 // Package grade moves colours, never pixels: fit recovers a
 // reference's colour treatment as a HALD lookup table, and apply runs one
-// through ImageMagick. -hald-clut on an image with alpha returns an opaque
-// rectangle, so apply grades the colour alone and puts the alpha back.
+// through ImageMagick. apply reads the source in sRGB, as fit's frames are,
+// so the table meets the values it was fitted on. -hald-clut on an image
+// with alpha returns an opaque rectangle, so apply grades the colour alone
+// and puts the alpha back.
 package grade
 
 import (
@@ -15,6 +17,8 @@ import (
 
 	"github.com/lockyc/imgkit/internal/cli"
 	"github.com/lockyc/imgkit/internal/engine"
+	"github.com/lockyc/imgkit/internal/frame"
+	"github.com/lockyc/imgkit/internal/icc"
 )
 
 const usage = "grade fit --ref ref.png [...] <subject.png> <out-hald.png>\n       imgkit grade apply --clut hald.png <in> <out.png>"
@@ -74,10 +78,16 @@ func apply(ctx context.Context, in, clut, out string) error {
 	if w != h || level*level*level != w {
 		return fmt.Errorf("%s is %dx%d, not a HALD CLUT (a square of side level³, e.g. 512 for level 8)", clut, w, h)
 	}
-	args := []string{in, "-alpha", "off", clut, "-hald-clut", out}
-	if !opaque {
-		args = []string{in, "-write", "mpr:src", "-alpha", "off", clut, "-hald-clut",
-			"(", "mpr:src", "-alpha", "extract", ")", "-alpha", "off", "-compose", "CopyOpacity", "-composite", out}
+	srgb, err := icc.SRGB()
+	if err != nil {
+		return err
+	}
+	args := frame.SRGBArgs(in, srgb)
+	if opaque {
+		args = append(args, "-alpha", "off", clut, "-hald-clut", out)
+	} else {
+		args = append(args, "-write", "mpr:src", "-alpha", "off", clut, "-hald-clut",
+			"(", "mpr:src", "-alpha", "extract", ")", "-alpha", "off", "-compose", "CopyOpacity", "-composite", out)
 	}
 	_, err = engine.Run(ctx, engine.Cmd{Engine: "magick", Args: args, Inputs: []string{in, clut}, Outputs: []string{out}})
 	return err

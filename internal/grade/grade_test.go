@@ -18,6 +18,7 @@ printf png > "$last"`
 
 func run(t *testing.T, args ...string) (int, string, [][]string) {
 	t.Helper()
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	log := enginetest.Stub(t, "magick", magickStub)
 	var o, e bytes.Buffer
 	code := Main(context.Background(), args, &o, &e)
@@ -31,8 +32,8 @@ func TestApplyKeepsAlpha(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("code %d: %s", code, stderr)
 	}
-	want := []string{"in.png", "-write", "mpr:src", "-alpha", "off", "h.png", "-hald-clut",
-		"(", "mpr:src", "-alpha", "extract", ")", "-alpha", "off", "-compose", "CopyOpacity", "-composite", out}
+	want := append(srgbPrefix(t, "in.png", calls[1]), "-write", "mpr:src", "-alpha", "off", "h.png", "-hald-clut",
+		"(", "mpr:src", "-alpha", "extract", ")", "-alpha", "off", "-compose", "CopyOpacity", "-composite", out)
 	if !slices.Equal(calls[1], want) {
 		t.Errorf("args %q\nwant %q", calls[1], want)
 	}
@@ -42,9 +43,24 @@ func TestApplyOpaque(t *testing.T) {
 	t.Setenv("IN_INFO", "True 200 100")
 	out := filepath.Join(t.TempDir(), "o.png")
 	code, _, calls := run(t, "apply", "--clut", "h.png", "in.jpg", out)
-	if code != 0 || !slices.Equal(calls[1], []string{"in.jpg", "-alpha", "off", "h.png", "-hald-clut", out}) {
+	if code != 0 || !slices.Equal(calls[1], append(srgbPrefix(t, "in.jpg", calls[1]), "-alpha", "off", "h.png", "-hald-clut", out)) {
 		t.Fatalf("code %d, args %q", code, calls)
 	}
+}
+
+// srgbPrefix is the source read upright and converted to sRGB, as fit's
+// frames are, so the table fit built is applied to the values it was built
+// from. No -strip and no -depth: the output keeps the source's depth and is
+// tagged sRGB.
+func srgbPrefix(t *testing.T, in string, call []string) []string {
+	t.Helper()
+	if len(call) < 4 || !strings.HasSuffix(call[3], ".icc") {
+		t.Fatalf("no sRGB profile in %q", call)
+	}
+	if slices.Contains(call, "-strip") || slices.Contains(call, "-depth") {
+		t.Errorf("apply must keep the source's depth and tag: %q", call)
+	}
+	return []string{in, "-auto-orient", "-profile", call[3]}
 }
 
 func TestApplyRefuses(t *testing.T) {
