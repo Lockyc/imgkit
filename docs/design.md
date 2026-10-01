@@ -133,12 +133,12 @@ colours, or renders what it is given.
 macOS is primary. The floor is the locked wheels': Apple Silicon on macOS 14
 or later, and Linux with glibc 2.28 or later on x86_64 or arm64. On Linux,
 everything works except `--coarse vision`, which exits with a message pointing
-at `birefnet`; on arm64, Chrome for Testing publishes no chrome-headless-shell,
-so `render` runs only with one supplied through
-`IMGKIT_ENGINE_CHROME_HEADLESS_SHELL`. On an Intel Mac, `ml.RunScript` refuses a script whose
-lockfile holds a package built for Apple Silicon only (PyTorch, ONNX
-Runtime), so `cutout` and `upscale` refuse before uv runs; `grade fit` needs
-macOS 14 or later there, and `inpaint`, whose iopaint resolves its own
+at `birefnet`; on arm64, Chrome for Testing publishes no
+chrome-headless-shell, so `render` runs only with one supplied through
+`IMGKIT_ENGINE_CHROME_HEADLESS_SHELL`. On an Intel Mac, `ml.RunScript` refuses
+a script whose lockfile holds a package built for Apple Silicon only (PyTorch,
+ONNX Runtime), so `cutout` and `upscale` refuse before uv runs; `grade fit`
+needs macOS 14 or later there, and `inpaint`, whose iopaint resolves its own
 older PyTorch there, is untested. No command depends on GNU-only flags. An
 operation that cannot do the job fails with the measured reason ("no
 foreground found", "render would be 61.7 MP"), and never leaves a
@@ -148,7 +148,7 @@ plausible-looking wrong file behind.
 
 `go test ./...` covers everything that needs no model or browser, standing
 sh stubs in for engines through `IMGKIT_ENGINE_<NAME>`. `just quality` runs
-every operation over `quality/`: openly licensed or synthetic test images,
+the quality cases over `quality/`: openly licensed or synthetic test images,
 each asset registered in `quality/assets.toml` with its source and licence,
 each case in `quality/cases.toml` (fields: `quality.Case`) with its metric
 (`quality.Metrics`) and threshold, which only ever tightens. It needs the

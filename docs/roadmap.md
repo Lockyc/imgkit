@@ -29,6 +29,13 @@ Phases run in order. Within a phase, order is open.
 
 ## Deferred
 
+- **doctor runs no managed engine.** `doctor` reports chrome-headless-shell
+  ok once its pinned build is unpacked, without starting it, so a Linux host
+  missing Chrome's shared libraries (libnss3 and the like) passes `doctor`
+  and fails at the first `render`. Deferred because the hosts imgkit is
+  measured on have them. Unlock: `doctor` smoke-runs each managed engine
+  with `--version` and reports the loader's error.
+
 - **cutout on semi-transparent subjects.** Smoke, glass or a dandelion
   clock may be refused as "no foreground found": their mask is soft across
   the whole subject, not just at its edge, and the empty-frame check

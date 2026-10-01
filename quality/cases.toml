@@ -52,7 +52,7 @@ absent = ["{tmp:p.pdf}"]
 [[case]]
 name   = "press-clean-master"
 why    = "a Chrome PDF with text, a photo and brand colours presses to outlined CMYK that passes its own soft proof"
-files  = { "page.html" = '''<!doctype html><style>@page{size:1200px 896px;margin:0}html,body{margin:0;width:1200px;height:896px}body{background:#fdfcf1;font:bold 96px sans-serif;color:#062d5f}img{width:600px;height:400px;display:block}.bar{position:absolute;bottom:0;width:100%;height:100px;background:#f7a81b;color:#062d5f;font-size:40px}</style><p>Auction night</p><img src="photo.jpg"><div class="bar">Authorised by the organiser, 1 Example St</div>''' }
+files  = { "page.html" = '''<!doctype html><style>@page{size:1200px 896px;margin:0}html,body{margin:0;width:1200px;height:896px}body{background:#fdfcf1;font:bold 96px sans-serif;color:#062d5f}img{width:600px;height:400px;display:block}.bar{position:absolute;bottom:0;width:100%;height:100px;background:#f7a81b;color:#062d5f;font-size:40px}</style><p>Sample heading</p><img src="photo.jpg"><div class="bar">Footer text, 1 Example St</div>''' }
 setup  = [
   ["magick", "-size", "1200x800", "gradient:#c9a27e-#35606b", "-seed", "7", "-attenuate", "0.3", "+noise", "Gaussian", "-quality", "92", "{tmp:photo.jpg}"],
   ["imgkit", "render", "--size", "1200x896", "--pdf", "{tmp:src.pdf}", "{tmp:page.html}"],
@@ -85,10 +85,10 @@ stdout = "OVER"
 name   = "qr-decodes"
 why    = "the code must decode to exactly the text given"
 files  = { "page.html" = '''<!doctype html><style>html,body{margin:0;background:#fff}img{display:block;width:137px;margin:40px}</style><img src="qr.svg">''' }
-run    = ["qr", "--fg", "062D5F", "-o", "{tmp:qr.svg}", "https://example.org/auction"]
+run    = ["qr", "--fg", "062D5F", "-o", "{tmp:qr.svg}", "https://example.org/sample"]
 post   = [["imgkit", "render", "--size", "400x400", "--scale", "1.5", "--png", "{tmp:qr.png}", "{tmp:page.html}"]]
 metric = "qr-decodes"
-params = { image = "{tmp:qr.png}", text = "https://example.org/auction" }
+params = { image = "{tmp:qr.png}", text = "https://example.org/sample" }
 min    = 1
 
 [[case]]

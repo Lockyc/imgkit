@@ -51,11 +51,11 @@ itself, chrome-headless-shell for `render`, then checks every other engine
 against its pin and prints the install command for any that is missing or too
 old, naming the commands that will not run until it is fixed.
 
-`uv` is the only Python tool to install. The ML commands (`cutout`,
-`inpaint`, `upscale`, `grade fit`) run through it, and the first run of each
-downloads its Python dependencies and model weights: several GB on Linux,
-where PyTorch ships with CUDA. These land in uv's, Hugging Face's, rembg's and
-PyTorch's own caches in your home directory, not in imgkit's.
+`uv` is the only Python tool to install. The ML commands (`cutout`, `inpaint`,
+`upscale`, `grade fit`) run through it, and the first run of each downloads
+its Python dependencies and, for the models, their weights: several GB on
+Linux, where PyTorch ships with CUDA. These land in uv's, Hugging Face's,
+rembg's and PyTorch's own caches in your home directory, not in imgkit's.
 
 ViTMatte and DAT run on the GPU when PyTorch finds one; BiRefNet runs on the
 CPU, and so does LaMa on a Mac. `IMGKIT_DEVICE=cpu` (or `mps`, `cuda`)
@@ -68,14 +68,15 @@ chooses the PyTorch device instead.
   `cutout --coarse vision`, which needs Apple Vision; `cutout` uses
   `--coarse birefnet` there. On arm64, Chrome for Testing publishes no
   chrome-headless-shell build, so `render` needs one supplied through
-  `IMGKIT_ENGINE_CHROME_HEADLESS_SHELL`.
+  `IMGKIT_ENGINE_CHROME_HEADLESS_SHELL`. chrome-headless-shell needs the usual
+  Chrome shared libraries (libnss3 and the like) from the distribution.
 - **Intel Macs**: `cutout` and `upscale` refuse to run, because PyTorch and
   ONNX Runtime publish no build for them; `grade fit` needs macOS 14 or later;
   `inpaint` is untested. The other commands work.
 
 ## Quality
 
-`just quality` runs every command over the openly licensed and synthetic
+`just quality` runs the quality cases over the openly licensed and synthetic
 images in `quality/` and checks each result against a measured threshold. It
 needs every engine and model, so it runs locally, not in CI.
 
