@@ -17,6 +17,7 @@ import (
 	"github.com/lockyc/imgkit/internal/doctor"
 	"github.com/lockyc/imgkit/internal/fonts"
 	"github.com/lockyc/imgkit/internal/grade"
+	"github.com/lockyc/imgkit/internal/inpaint"
 	"github.com/lockyc/imgkit/internal/press"
 	"github.com/lockyc/imgkit/internal/qr"
 	"github.com/lockyc/imgkit/internal/render"
@@ -39,6 +40,7 @@ var commands = []command{
 	{"qr", "a QR code SVG, dark on light, quiet zone included", qr.Main},
 	{"grade", "grade fit: fit a colour grade from a reference; apply it", grade.Main},
 	{"cutout", "lift the subject out of an image as RGBA, down to hair and fur", cutout.Main},
+	{"inpaint", "fill a masked region with LaMa (synthesises pixels)", inpaint.Main},
 }
 
 func main() {
