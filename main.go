@@ -17,6 +17,7 @@ import (
 	"github.com/lockyc/imgkit/internal/doctor"
 	"github.com/lockyc/imgkit/internal/fonts"
 	"github.com/lockyc/imgkit/internal/grade"
+	"github.com/lockyc/imgkit/internal/infill"
 	"github.com/lockyc/imgkit/internal/inpaint"
 	"github.com/lockyc/imgkit/internal/press"
 	"github.com/lockyc/imgkit/internal/qr"
@@ -41,6 +42,7 @@ var commands = []command{
 	{"grade", "grade fit: fit a colour grade from a reference; apply it", grade.Main},
 	{"cutout", "lift the subject out of an image as RGBA, down to hair and fur", cutout.Main},
 	{"inpaint", "fill a masked region with LaMa (synthesises pixels)", inpaint.Main},
+	{"infill", "fill a hole in a flat ground from its surroundings (synthesises pixels)", infill.Main},
 }
 
 func main() {
