@@ -16,7 +16,7 @@ Phases in build order. Each ships when its acceptance gate passes.
 | 1 | Shipped | `internal/engine`, `internal/pins`, `doctor`, the `imgkit.toml` synthesis policy, the `quality/` harness | stub-engine tests; `doctor` reports this machine accurately |
 | 2 | Shipped | Deterministic ops: `render`, `press`, `diff`, `fonts`, `qr`, `grade apply` | unit tests and quality cases pass |
 | 3 | Shipped | ML ops: `cutout`, `grade fit`, `inpaint`, `upscale`, `infill` | quality cases pass at their recorded thresholds |
-| 4 | Not started | `v0.1.0` release | release gate green; README curated |
+| 4 | Shipped | `v0.1.0` release | release gate green; README curated |
 | 5 | Not started | Regression check against the pipelines imgkit replaces, then each project's cutover | no measured regression; each cutover approved by its owner |
 
 **Phase 5 changes nothing in a consuming project until its owner approves

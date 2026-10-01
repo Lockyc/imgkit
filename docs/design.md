@@ -133,7 +133,9 @@ colours, or renders what it is given.
 macOS is primary. The floor is the locked wheels': Apple Silicon on macOS 14
 or later, and Linux with glibc 2.28 or later on x86_64 or arm64. On Linux,
 everything works except `--coarse vision`, which exits with a message pointing
-at `birefnet`. On an Intel Mac, `ml.RunScript` refuses a script whose
+at `birefnet`; on arm64, Chrome for Testing publishes no chrome-headless-shell,
+so `render` runs only with one supplied through
+`IMGKIT_ENGINE_CHROME_HEADLESS_SHELL`. On an Intel Mac, `ml.RunScript` refuses a script whose
 lockfile holds a package built for Apple Silicon only (PyTorch, ONNX
 Runtime), so `cutout` and `upscale` refuse before uv runs; `grade fit` needs
 macOS 14 or later there, and `inpaint`, whose iopaint resolves its own

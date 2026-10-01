@@ -62,5 +62,5 @@ the README is curated at each release.
 ## Commands
 
 ```bash
-just build | just test | just gate | just install
+just build | just test | just gate | just quality | just lock-ml | just install
 ```
