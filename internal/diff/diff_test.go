@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/lockyc/imgkit/internal/raster"
 )
@@ -202,5 +203,22 @@ func TestCompareError(t *testing.T) {
 	b := image.NewRGBA64(image.Rect(0, 0, 0, 0))
 	if _, _, _, err := Compare(a, b, 28, 60, 2); err == nil {
 		t.Error("empty image should return error")
+	}
+}
+
+func TestCompareHugeMaxShift(t *testing.T) {
+	a := noise(20, 40, 3)
+	done := make(chan Result, 1)
+	go func() {
+		res, _, _, _ := Compare(a, shiftDown(a, 2), 28, 1<<40, 1)
+		done <- res
+	}()
+	select {
+	case res := <-done:
+		if res.Shift != 2 {
+			t.Errorf("shift %d, want 2", res.Shift)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Compare spun on a huge --max-shift")
 	}
 }

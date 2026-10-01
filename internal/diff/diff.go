@@ -73,6 +73,7 @@ func Compare(a, b *image.RGBA64, tol uint8, maxShift, step int) (Result, *image.
 	if step < 1 {
 		step = 1
 	}
+	maxShift = min(maxShift, h)
 	A, B := to8(a, w, h), to8(b, w, h)
 	best, bestTop, bestBottom := Result{Percent: -1}, 0, 0
 	for k := -maxShift / step; k <= maxShift/step; k++ {

@@ -56,12 +56,18 @@ func apply(ctx context.Context, in, clut, out string) error {
 	}
 	lines := strings.Split(strings.TrimSpace(string(res.Stdout)), "\n")
 	if len(lines) != 2 {
-		return fmt.Errorf("could not read %s and %s", in, clut)
+		return fmt.Errorf("could not read %s and %s: expected one frame per file (a multi-frame input is not supported)", in, clut)
 	}
 	opaque := strings.HasPrefix(lines[0], "True")
 	cf := strings.Fields(lines[1])
-	w, _ := strconv.Atoi(cf[1])
-	h, _ := strconv.Atoi(cf[2])
+	if len(cf) < 3 {
+		return fmt.Errorf("could not read the size of %s", clut)
+	}
+	w, errW := strconv.Atoi(cf[1])
+	h, errH := strconv.Atoi(cf[2])
+	if errW != nil || errH != nil {
+		return fmt.Errorf("could not read the size of %s", clut)
+	}
 	level := int(math.Round(math.Cbrt(float64(w))))
 	if w != h || level*level*level != w {
 		return fmt.Errorf("%s is %dx%d, not a HALD CLUT (a square of side level³, e.g. 512 for level 8)", clut, w, h)

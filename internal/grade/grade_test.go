@@ -3,7 +3,7 @@ package grade
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -66,7 +66,7 @@ func TestApplyRefuseSameFile(t *testing.T) {
 	dir := t.TempDir()
 	infile := filepath.Join(dir, "in.png")
 	// Create a file with content
-	if err := ioutil.WriteFile(infile, []byte("original content"), 0o644); err != nil {
+	if err := os.WriteFile(infile, []byte("original content"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("IN_INFO", "True 200 100")
@@ -76,11 +76,21 @@ func TestApplyRefuseSameFile(t *testing.T) {
 		t.Errorf("same file: code %d, %q", code, stderr)
 	}
 	// Check that the file contents survived
-	content, err := ioutil.ReadFile(infile)
+	content, err := os.ReadFile(infile)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if string(content) != "original content" {
 		t.Errorf("file was modified; got %q", string(content))
+	}
+}
+
+func TestApplyMalformedIdentify(t *testing.T) {
+	for _, info := range []string{"True", "True 512", "True x y"} {
+		t.Setenv("CLUT_INFO", info)
+		code, stderr, _ := run(t, "apply", "--clut", "h.png", "in.png", filepath.Join(t.TempDir(), "o.png"))
+		if code != 1 || !strings.Contains(stderr, "h.png") {
+			t.Errorf("CLUT_INFO %q: code %d, %q", info, code, stderr)
+		}
 	}
 }
