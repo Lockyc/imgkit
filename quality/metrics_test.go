@@ -2,8 +2,8 @@ package quality
 
 import (
 	"image"
-	"math"
 	"image/color"
+	"math"
 	"path/filepath"
 	"testing"
 
