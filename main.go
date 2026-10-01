@@ -14,6 +14,7 @@ import (
 
 	"github.com/lockyc/imgkit/internal/diff"
 	"github.com/lockyc/imgkit/internal/doctor"
+	"github.com/lockyc/imgkit/internal/fonts"
 	"github.com/lockyc/imgkit/internal/press"
 	"github.com/lockyc/imgkit/internal/render"
 )
@@ -31,6 +32,7 @@ var commands = []command{
 	{"render", "HTML to PNG and/or PDF with headless Chrome", render.Main},
 	{"press", "PDF to a print master: outlined text, CMYK, checked against a soft proof", press.Main},
 	{"diff", "compare two images after lining them up vertically", diff.Main},
+	{"fonts", "embed web fonts into a CSS file as data: URIs", fonts.Main},
 }
 
 func main() {
