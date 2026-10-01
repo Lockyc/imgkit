@@ -49,3 +49,19 @@ author  = "Yann (User:Yann on Wikimedia Commons)"
 licence = "CC BY-SA 4.0"
 recipe  = "resized by imgkit: magick SOURCE -resize 2000x2000 -quality 90 -strip detail-photo.jpg"
 sha256  = "d46e69b1e4e63bffdf15e7dad7735b89061159d1642e3531271860d6b54a4b4e"
+
+[[asset]]
+file    = "paper-ground.jpg"
+source  = "https://commons.wikimedia.org/wiki/File:Blank_page,_brown_paper_texture_(14802136533).jpg"
+author  = "Internet Archive Book Images (a blank page of Armide, Henry Lemoine & Cie, Paris)"
+licence = "No known copyright restrictions (Flickr Commons)"
+recipe  = "cropped by imgkit: magick SOURCE -crop 1600x1600+574+1150 +repage -quality 92 -strip paper-ground.jpg"
+sha256  = "510673fce871af1b7c8c8ca61aa4423c37ea5aa79baec0b8ff9d08b3305ea122"
+
+[[asset]]
+file    = "sky-ground.jpg"
+source  = "https://commons.wikimedia.org/wiki/File:Clear_blue_sky_(4-12-2026).jpg"
+author  = "SpongeLover08"
+licence = "CC0"
+recipe  = "resized and cropped by imgkit: magick SOURCE -resize 50% -crop 1500x1500+18+540 +repage -quality 92 -strip sky-ground.jpg"
+sha256  = "7cee9175cb1e874c4232a513cfa429738b845b07c97f24384a8d261659437b8b"

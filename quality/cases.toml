@@ -252,12 +252,33 @@ stdout = "wrote"
 
 [[case]]
 name   = "infill-texture"
-why    = "a filled hole must not be flatter than the ground around it"
+why    = "a filled hole in plaster must be neither flatter nor grainier than the ground around it"
 setup  = [["magick", "-size", "1521x1521", "xc:black", "-fill", "white", "-draw", "circle 760,760 760,610", "{tmp:mask.png}"]]
 run    = ["infill", "--mask", "{tmp:mask.png}", "{asset:flat-ground.jpg}", "{tmp:out.png}"]
 metric = "std-ratio"
 params = { a = "{tmp:out.png}", b = "{asset:flat-ground.jpg}", mask = "{tmp:mask.png}", ring = 40 }
-min    = 0.27
+min    = 0.8
+max    = 1.2
+
+[[case]]
+name   = "infill-texture-paper"
+why    = "a filled hole in fibred paper must be neither flatter nor grainier than the paper around it"
+setup  = [["magick", "-size", "1600x1600", "xc:black", "-fill", "white", "-draw", "circle 800,800 800,650", "{tmp:mask.png}"]]
+run    = ["infill", "--mask", "{tmp:mask.png}", "{asset:paper-ground.jpg}", "{tmp:out.png}"]
+metric = "std-ratio"
+params = { a = "{tmp:out.png}", b = "{asset:paper-ground.jpg}", mask = "{tmp:mask.png}", ring = 40 }
+min    = 0.8
+max    = 1.2
+
+[[case]]
+name   = "infill-sky-not-grainy"
+why    = "a filled hole in a smooth sky must be neither flatter nor grainier than the sky around it"
+setup  = [["magick", "-size", "1500x1500", "xc:black", "-fill", "white", "-draw", "circle 750,750 750,600", "{tmp:mask.png}"]]
+run    = ["infill", "--mask", "{tmp:mask.png}", "{asset:sky-ground.jpg}", "{tmp:out.png}"]
+metric = "std-ratio"
+params = { a = "{tmp:out.png}", b = "{asset:sky-ground.jpg}", mask = "{tmp:mask.png}", ring = 40 }
+min    = 0.8
+max    = 1.1
 
 [[case]]
 name   = "inpaint-texture"
