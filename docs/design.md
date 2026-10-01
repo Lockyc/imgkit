@@ -8,8 +8,8 @@ links:
 
 # imgkit — design
 
-The architecture imgkit is being built to. Phase 1 (engines, pins, doctor,
-policy, quality harness) is built; [roadmap.md](roadmap.md) tracks the rest.
+The architecture imgkit is being built to; [roadmap.md](roadmap.md) tracks
+what is built and what comes next.
 
 ## Shape
 
@@ -20,14 +20,18 @@ calls imgkit. Plain resize, crop and encode stay as `magick` calls in the
 recipe, because wrapping them would add nothing.
 
 ```
-main.go            dispatch
-internal/<op>/     one package per command (cutout, inpaint, infill, upscale,
-                   grade, render, press, diff, fonts, qr, doctor)
-internal/engine/   the one way an external tool is run
-internal/pins/     the one table of engine versions
-internal/ml/       embedded single-file Python scripts (uv run --script)
-internal/vision/   embedded Swift helper for Apple Vision (macOS)
-quality/           the test images, their licences, and cases.toml
+main.go              dispatch
+internal/<op>/       one package per command (cutout, inpaint, infill, upscale,
+                     grade, render, press, diff, fonts, qr, doctor)
+internal/cli/        flag, exit-code and error conventions every command shares
+internal/engine/     the one way an external tool is run
+internal/enginetest/ sh stubs that stand in for engines in tests
+internal/pins/       the one table of engine versions
+internal/policy/     the imgkit.toml synthesis policy
+internal/raster/     in-process pixel work: load, measure, small PNG edits
+internal/ml/         embedded single-file Python scripts (uv run --script)
+internal/vision/     embedded Swift helper for Apple Vision (macOS)
+quality/             the test images, their licences, and cases.toml
 ```
 
 ## Engines
@@ -107,10 +111,11 @@ plausible-looking wrong file behind.
 
 ## Quality
 
-`go test ./...` covers everything that needs no model or browser, using stub
-engines on `PATH`. `just quality` runs every operation over `quality/`: openly
-licensed or synthetic test images, each asset registered in `quality/assets.toml`
-with its source and licence, each case in `quality/cases.toml` (fields:
-`quality.Case`) with its metric and threshold (fringe pixels, see-through
-pixels inside the subject, seam visibility, a refused oversized render). It needs the models and runs
+`go test ./...` covers everything that needs no model or browser, standing
+sh stubs in for engines through `IMGKIT_ENGINE_<NAME>`. `just quality` runs
+every operation over `quality/`: openly licensed or synthetic test images,
+each asset registered in `quality/assets.toml` with its source and licence,
+each case in `quality/cases.toml` (fields: `quality.Case`) with its metric and
+threshold (fringe pixels, see-through pixels inside the subject, seam
+visibility, a refused oversized render). It needs the models and runs
 locally, not in CI.
