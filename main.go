@@ -37,7 +37,7 @@ var commands = []command{
 	{"diff", "compare two images after lining them up vertically", diff.Main},
 	{"fonts", "embed web fonts into a CSS file as data: URIs", fonts.Main},
 	{"qr", "a QR code SVG, dark on light, quiet zone included", qr.Main},
-	{"grade", "grade apply: apply a HALD colour lookup, keeping transparency", grade.Main},
+	{"grade", "grade fit: fit a colour grade from a reference; apply it", grade.Main},
 	{"cutout", "lift the subject out of an image as RGBA, down to hair and fur", cutout.Main},
 }
 

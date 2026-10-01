@@ -1,4 +1,4 @@
-// Package grade moves colours, never pixels: fit (Phase 3) recovers a
+// Package grade moves colours, never pixels: fit recovers a
 // reference's colour treatment as a HALD lookup table, and apply runs one
 // through ImageMagick. -hald-clut on an image with alpha returns an opaque
 // rectangle, so apply grades the colour alone and puts the alpha back.
@@ -17,12 +17,14 @@ import (
 	"github.com/lockyc/imgkit/internal/engine"
 )
 
-const usage = "grade apply --clut hald.png <in> <out.png>"
+const usage = "grade fit --ref ref.png [...] <subject.png> <out-hald.png>\n       imgkit grade apply --clut hald.png <in> <out.png>"
 
 // Main dispatches `imgkit grade <subcommand>`.
 func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if len(args) > 0 {
 		switch args[0] {
+		case "fit":
+			return fitMain(ctx, args[1:], stdout, stderr)
 		case "apply":
 			return applyMain(ctx, args[1:], stdout, stderr)
 		}
