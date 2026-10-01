@@ -148,7 +148,7 @@ func (e Env) step(ctx context.Context, step []string) error {
 }
 
 // RunCase writes the case's files, runs setup, run and post, and checks the
-// exit status, stderr and absent files. The metric is the caller's.
+// exit status, stderr, stdout and absent files. The metric is the caller's.
 func (e Env) RunCase(ctx context.Context, c Case) error {
 	for name, body := range c.Files {
 		if err := os.WriteFile(filepath.Join(e.Tmp, name), []byte(body), 0o644); err != nil {

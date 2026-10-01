@@ -1,4 +1,3 @@
-// internal/policy/policy_test.go
 package policy
 
 import (

@@ -82,7 +82,7 @@ var Engines = []Engine{
 	{
 		Name: "magick", Kind: Minimum,
 		VersionArgs: []string{"-version"}, VersionRe: `Version: ImageMagick (\d+\.\d+\.\d+(?:-\d+)?)`, Min: "7.1.0",
-		Install: map[string]string{"darwin": "brew install imagemagick", "linux": "install ImageMagick 7 from https://imagemagick.org/script/download.php (distribution packages are often ImageMagick 6)"},
+		Install: map[string]string{"darwin": "brew install imagemagick", "linux": "install ImageMagick from https://imagemagick.org/script/download.php (distribution packages are often too old)"},
 		UsedBy:  []string{"cutout", "infill", "inpaint", "grade"},
 	},
 	{
