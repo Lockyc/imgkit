@@ -1,5 +1,5 @@
 // Package engine is the one way imgkit runs an external tool. Every call gets
-// a timeout; success means exit status 0 (or one listed in OKExit) and every
+// a timeout; success means exit status 0 and every
 // declared output existing and non-empty, because Chrome exits 0 when it
 // renders nothing and prints noise on stderr when it succeeds; a declared
 // output is deleted before the run and again if the run fails, so a failure
@@ -19,7 +19,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 	"time"
 
@@ -82,6 +81,9 @@ func Resolve(name string) (string, error) {
 // or (Minimum) PATH.
 func Find(e pins.Engine) (string, error) {
 	if p := os.Getenv(EnvOverride(e.Name)); p != "" {
+		if !executable(p) {
+			return "", &NotInstalledError{Engine: e.Name, Hint: EnvOverride(e.Name) + "=" + p + " is not an executable file"}
+		}
 		return p, nil
 	}
 	missing := &NotInstalledError{Engine: e.Name, Hint: e.Hint()}
@@ -97,8 +99,7 @@ func Find(e pins.Engine) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		p := filepath.Join(dir, a.Bin)
-		if fi, err := os.Stat(p); err == nil && fi.Mode()&0o111 != 0 {
+		if p := filepath.Join(dir, a.Bin); executable(p) {
 			return p, nil
 		}
 		return "", missing
@@ -110,18 +111,19 @@ func Find(e pins.Engine) (string, error) {
 	return p, nil
 }
 
+func executable(p string) bool {
+	fi, err := os.Stat(p)
+	return err == nil && fi.Mode().IsRegular() && fi.Mode()&0o111 != 0
+}
+
 // Cmd is one engine invocation. Inputs and Outputs are paths as imgkit sees
 // them, relative to its own working directory rather than Dir.
 type Cmd struct {
 	Engine      string // pin-table name; resolves the executable unless Path is set
 	Path        string // an executable imgkit built itself; Engine is then only a label
 	Args        []string
-	Dir         string
-	Env         []string // added to the inherited environment
-	Stdin       io.Reader
 	Timeout     time.Duration // 0 means DefaultTimeout
 	StderrFatal bool          // any stderr output fails the call
-	OKExit      []int         // non-zero exit statuses that are not failures
 	Inputs      []string      // files the engine reads; none may also be an output
 	Outputs     []string      // files that must exist and be non-empty afterwards
 }
@@ -198,10 +200,6 @@ func run(ctx context.Context, path string, c Cmd) (Result, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, path, c.Args...)
-	cmd.Dir = c.Dir
-	if len(c.Env) > 0 {
-		cmd.Env = append(os.Environ(), c.Env...)
-	}
 	stdout, err := scratch()
 	if err != nil {
 		return Result{}, err
@@ -213,20 +211,6 @@ func run(ctx context.Context, path string, c Cmd) (Result, error) {
 	}
 	defer stderr.Close()
 	cmd.Stdout, cmd.Stderr = stdout, stderr
-	if c.Stdin != nil {
-		stdin, err := scratch()
-		if err != nil {
-			return Result{}, err
-		}
-		defer stdin.Close()
-		if _, err := io.Copy(stdin, c.Stdin); err != nil {
-			return Result{}, err
-		}
-		if _, err := stdin.Seek(0, io.SeekStart); err != nil {
-			return Result{}, err
-		}
-		cmd.Stdin = stdin
-	}
 	killGroupOnCancel(cmd)
 	if err = cmd.Start(); err == nil {
 		err = cmd.Wait()
@@ -243,13 +227,7 @@ func run(ctx context.Context, path string, c Cmd) (Result, error) {
 		return fail("cancelled")
 	}
 	if err != nil {
-		var ee *exec.ExitError
-		if !errors.As(err, &ee) {
-			return fail(err.Error())
-		}
-		if !slices.Contains(c.OKExit, ee.ExitCode()) {
-			return fail(ee.Error())
-		}
+		return fail(err.Error())
 	}
 	if c.StderrFatal && len(bytes.TrimSpace(res.Stderr)) > 0 {
 		return fail("reported a problem on stderr")
@@ -297,9 +275,13 @@ func Version(ctx context.Context, e pins.Engine) (string, error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	out, _ := exec.CommandContext(ctx, path, e.VersionArgs...).CombinedOutput()
+	out, err := exec.CommandContext(ctx, path, e.VersionArgs...).CombinedOutput()
 	m := regexp.MustCompile(e.VersionRe).FindSubmatch(out)
 	if m == nil {
+		var ee *exec.ExitError
+		if err != nil && !errors.As(err, &ee) {
+			return "", fmt.Errorf("%s: %w", e.Name, err)
+		}
 		return "", fmt.Errorf("%s: no version in %q", e.Name, lastLines(string(out), 1))
 	}
 	return string(m[1]), nil

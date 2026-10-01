@@ -49,6 +49,9 @@ var commands = []command{
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	// The first signal cancels; restoring the default lets a second one kill
+	// work that does not watch ctx.
+	go func() { <-ctx.Done(); stop() }()
 	code := run(ctx, os.Args[1:], os.Stdout, os.Stderr)
 	stop()
 	os.Exit(code)

@@ -5,6 +5,7 @@ package doctor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -89,7 +90,12 @@ func check(ctx context.Context, e pins.Engine) status {
 	}
 	path, err := engine.Find(e)
 	if err != nil {
-		s.note = "missing: " + e.Hint()
+		var nie *engine.NotInstalledError
+		if errors.As(err, &nie) {
+			s.note = "missing: " + nie.Hint
+		} else {
+			s.note = err.Error()
+		}
 		return s
 	}
 	if o := os.Getenv(engine.EnvOverride(e.Name)); o != "" {

@@ -46,9 +46,7 @@ quality/             the test images, their licences, and cases.toml
 - success means the output file exists and is non-empty, never the exit code
   alone, because Chrome exits 0 on failure and prints noise on success;
 - a per-engine stderr policy: fatal for Ghostscript, where stderr is the only
-  sign it dropped an image;
-- per-call exit-code handling (`engine.Cmd.OKExit`) for tools whose non-zero
-  exit is not an error.
+  sign it dropped an image.
 
 `internal/pins` is the only place an engine version is written down. `doctor`
 reads it, and so does every "not installed" error, which prints the exact

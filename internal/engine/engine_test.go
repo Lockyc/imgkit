@@ -67,10 +67,21 @@ func TestRunExitStatusFailsAndRemovesOutput(t *testing.T) {
 	}
 }
 
-func TestRunOKExit(t *testing.T) {
-	enginetest.Stub(t, "magick", `exit 1`)
-	if _, err := engine.Run(ctx, engine.Cmd{Engine: "magick", OKExit: []int{1}}); err != nil {
-		t.Fatal(err)
+func TestFindRefusesAMissingOverride(t *testing.T) {
+	t.Setenv(engine.EnvOverride("magick"), filepath.Join(t.TempDir(), "nope"))
+	var nie *engine.NotInstalledError
+	if _, err := engine.Resolve("magick"); !errors.As(err, &nie) || !strings.Contains(err.Error(), "IMGKIT_ENGINE_MAGICK") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestVersionReportsAnExecFailure(t *testing.T) {
+	bad := filepath.Join(t.TempDir(), "magick")
+	os.WriteFile(bad, []byte("#!/no/such/interpreter\n"), 0o755)
+	t.Setenv(engine.EnvOverride("magick"), bad)
+	e, _ := pins.Lookup("magick")
+	if _, err := engine.Version(ctx, e); err == nil || strings.Contains(err.Error(), "no version in") {
+		t.Fatalf("err = %v", err)
 	}
 }
 
