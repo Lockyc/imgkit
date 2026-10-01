@@ -62,8 +62,9 @@ func run(ctx context.Context, in, mask, out string) error {
 	}
 	defer os.RemoveAll(tmp)
 	// LaMa reads the normalised frame under a fixed name, so iopaint's
-	// output name is known, and the mask oriented the same way, so a mask
-	// drawn on the displayed image lines up.
+	// output name is known. The mask is framed the same way, so a mask drawn
+	// on the displayed image lines up, and as 8-bit: iopaint reads it with
+	// PIL's convert("L"), which clips a 16-bit grey PNG to white.
 	src, m, outDir := filepath.Join(tmp, "in.png"), filepath.Join(tmp, "mask.png"), filepath.Join(tmp, "out")
 	if err := os.Mkdir(outDir, 0o755); err != nil {
 		return err
@@ -71,7 +72,7 @@ func run(ctx context.Context, in, mask, out string) error {
 	if err := frame.Write(ctx, in, src, frame.Options{Opaque: true}); err != nil {
 		return err
 	}
-	if err := frame.Orient(ctx, mask, m); err != nil {
+	if err := frame.Write(ctx, mask, m, frame.Options{Opaque: true}); err != nil {
 		return err
 	}
 	iw, ih, err := imgsize.Dims(src)

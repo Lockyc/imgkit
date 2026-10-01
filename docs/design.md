@@ -26,7 +26,7 @@ internal/<op>/       one package per command (cutout, inpaint, infill, upscale,
 internal/cli/        flag, exit-code and error conventions every command shares
 internal/engine/     the one way an external tool is run
 internal/frame/      the source pre-pass the ML ops read: oriented, sRGB, 8-bit
-                     RGB(A) PNG; or oriented only, for infill and masks
+                     RGB(A) PNG; or oriented only, for infill
 internal/icc/        the embedded sRGB profile
 internal/enginetest/ sh stubs that stand in for engines in tests
 internal/pins/       the one table of engine versions

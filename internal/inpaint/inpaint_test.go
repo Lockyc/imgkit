@@ -21,13 +21,13 @@ func pngOf(t *testing.T, dir, name string, w, h int) string {
 }
 
 // magick copies its first argument to its last, less a PNG24: prefix, or
-// the image at $ROT for the frame call when ROT is set, playing a source
+// the image at $ROT for the image's frame call when ROT is set, playing a source
 // whose EXIF rotation turns it; uv plays iopaint, writing the image into
 // --output under its own name, and answers the device probe with mps.
 func stubs(t *testing.T) (magick, uv string) {
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	return enginetest.Stub(t, "magick", `for a in "$@"; do last=$a; done
-src=$1; case "$last" in PNG24:*) [ -n "$ROT" ] && src=$ROT;; esac
+src=$1; [ -n "$ROT" ] && [ "$(basename "$1")" = in.png ] && src=$ROT
 cp "$src" "${last#PNG24:}"`), enginetest.Stub(t, "uv", `[ "$7" = python ] && { echo mps; exit 0; }
 img=; out=
 for a in "$@"; do case "$a" in --image=*) img=${a#--image=};; --output=*) out=${a#--output=};; esac; done
@@ -47,15 +47,16 @@ func TestInpaint(t *testing.T) {
 	if len(m) != 3 {
 		t.Fatalf("%d magick calls, want frame, mask, output: %q", len(m), m)
 	}
-	// The image is the opaque normalised frame; the mask is only oriented,
-	// so it lines up with the displayed image and keeps its values.
+	// The image and the mask are both opaque 8-bit frames: iopaint reads
+	// the mask through PIL's convert("L"), which clips a 16-bit grey PNG
+	// to white rather than scaling it.
 	frame := strings.TrimPrefix(m[0][len(m[0])-1], "PNG24:")
 	idx := func(s string) int { return slices.Index(m[0], s) }
 	if m[0][0] != in || !(0 < idx("-auto-orient") && idx("-auto-orient") < idx("-profile") && idx("-profile") < idx("-strip") && idx("-strip") < idx("off")) || !strings.HasPrefix(m[0][len(m[0])-1], "PNG24:") {
 		t.Errorf("frame args %q", m[0])
 	}
-	orientedMask := m[1][2]
-	if !slices.Equal(m[1], []string{mask, "-auto-orient", orientedMask}) || orientedMask == mask {
+	orientedMask := strings.TrimPrefix(m[1][len(m[1])-1], "PNG24:")
+	if m[1][0] != mask || !slices.Contains(m[1], "-auto-orient") || !slices.Contains(m[1], "8") || !strings.HasPrefix(m[1][len(m[1])-1], "PNG24:") {
 		t.Errorf("mask args %q", m[1])
 	}
 	if m[2][len(m[2])-1] != out {
