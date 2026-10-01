@@ -3,6 +3,7 @@ package infill
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"image"
 	"image/color"
 	"os"
@@ -21,15 +22,19 @@ func pngOf(t *testing.T, dir, name string, w, h int) string {
 	return p
 }
 
-// holedPNG writes a w x h grey image with grain and a transparent square in
-// the middle: what the magick stub hands back for every call, so the Go
-// grain step has a hole and a ground to work on.
-func holedPNG(t *testing.T, dir string, w, h int) string {
+// holedPNG writes a w x h grey image with faint grain and a transparent
+// square in the middle, and with band a dark strip along the bottom: what
+// the magick stub hands back for every call, so the Go steps have a hole and
+// a ground to work on.
+func holedPNG(t *testing.T, dir string, w, h int, band bool) string {
 	img := image.NewNRGBA(image.Rect(0, 0, w, h))
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
 			if x < w/2-5 || x >= w/2+5 || y < h/2-5 || y >= h/2+5 {
-				v := uint8(100 + (x*7+y*13)%40)
+				v := uint8(120 + (x*7+y*13)%5)
+				if band && y >= h-4 {
+					v = 20
+				}
 				img.Set(x, y, color.NRGBA{v, v, v, 255})
 			}
 		}
@@ -42,23 +47,37 @@ func holedPNG(t *testing.T, dir string, w, h int) string {
 }
 
 func TestInfill(t *testing.T) {
-	for _, grain := range []string{"1", "0"} {
-		t.Run("grain "+grain, func(t *testing.T) {
+	for _, c := range []struct {
+		grain string
+		band  bool
+	}{{"1", false}, {"0", false}, {"1", true}} {
+		t.Run(fmt.Sprintf("grain %s band %v", c.grain, c.band), func(t *testing.T) {
 			dir := t.TempDir()
 			t.Chdir(dir)
-			t.Setenv("FIXTURE", holedPNG(t, dir, 40, 30))
+			t.Setenv("FIXTURE", holedPNG(t, dir, 40, 30, c.band))
 			log := enginetest.Stub(t, "magick", `for a in "$@"; do last=$a; done; cp "$FIXTURE" "$last"`)
 			in, mask, out := pngOf(t, dir, "in.png", 40, 30), pngOf(t, dir, "m.png", 40, 30), filepath.Join(dir, "out.png")
 			var o, e bytes.Buffer
-			if code := Main(context.Background(), []string{"--mask", mask, "--levels", "30,6", "--grain", grain, in, out}, &o, &e); code != 0 {
+			if code := Main(context.Background(), []string{"--mask", mask, "--levels", "30,6", "--grain", c.grain, in, out}, &o, &e); code != 0 {
 				t.Fatalf("code %d: %s", code, e.String())
 			}
 			calls := enginetest.Calls(t, log)
+			blurSrc := "holes.png"
+			if c.band { // holes, edge stops, 2 blurs, fill, composite
+				if len(calls) != 6 || filepath.Base(calls[1][len(calls[1])-1]) != "reached.png" {
+					t.Fatalf("want an edge-stop call writing reached.png: %q", calls)
+				}
+				calls = append(calls[:1], calls[2:]...)
+				blurSrc = "reached.png"
+			}
 			if len(calls) != 5 { // holes, 2 blurs, fill, composite
 				t.Fatalf("%d magick calls, want 5: %q", len(calls), calls)
 			}
 			if !slices.Contains(calls[1], "0x30") || !slices.Contains(calls[2], "0x6") {
 				t.Errorf("blur levels: %q %q", calls[1], calls[2])
+			}
+			if filepath.Base(calls[1][0]) != blurSrc || filepath.Base(calls[2][0]) != blurSrc {
+				t.Errorf("blurs read %q and %q, want %s", calls[1][0], calls[2][0], blurSrc)
 			}
 			if slices.Contains(calls[3], "+noise") {
 				t.Errorf("fill adds magick noise: %q", calls[3])
@@ -68,8 +87,8 @@ func TestInfill(t *testing.T) {
 				t.Errorf("composite takes %q, want holes.png, the fill, then %s", comp, out)
 			}
 			pieces := slices.ContainsFunc(comp, func(a string) bool { return strings.HasPrefix(filepath.Base(a), "grain") })
-			if pieces != (grain == "1") {
-				t.Errorf("grain %s: composite has grained pieces = %v: %q", grain, pieces, comp)
+			if pieces != (c.grain == "1") {
+				t.Errorf("grain %s: composite has grained pieces = %v: %q", c.grain, pieces, comp)
 			}
 		})
 	}

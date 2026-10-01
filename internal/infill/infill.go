@@ -1,10 +1,10 @@
 // Package infill fills holes in a flat ground (paper, a painted wall, sky)
 // from their surroundings: each level blurs the image with its holes
 // transparent, keeps what the blur reached, and the levels stack from
-// coarse to fine, so a hole takes the colour of what is nearest. The blur
-// carries no grain, so texture then lays the ground's own fine detail,
-// in patches taken from around the hole, over the fill. It synthesises
-// pixels, so imgkit.toml can forbid it.
+// coarse to fine, so a hole takes the colour of what is nearest on its side
+// of any strong edge (edgeStops). The blur carries no grain, so texture then
+// lays the ground's own fine detail, in patches taken from around the hole,
+// over the fill. It synthesises pixels, so imgkit.toml can forbid it.
 package infill
 
 import (
@@ -93,10 +93,31 @@ func run(ctx context.Context, in, mask, out string, radii []int, grain float64, 
 	if err := magick([]string{in, mask}, in, "(", mask, "-negate", ")", "-alpha", "off", "-compose", "CopyOpacity", "-composite", holes); err != nil {
 		return err
 	}
+	// The levels see only the ground each hole reaches without crossing a
+	// strong edge; the finest level sets how lightly that edge test blurs.
+	src := holes
+	stops, err := edgeStops(holes, tmp, float64(radii[len(radii)-1])/2, 3*radii[0])
+	if err != nil {
+		return err
+	}
+	if len(stops) > 0 {
+		src = filepath.Join(tmp, "reached.png")
+		inputs := []string{holes}
+		keep := []string{"-size", fmt.Sprintf("%dx%d", iw, ih), "xc:white"}
+		for _, p := range stops {
+			inputs = append(inputs, p.path)
+			keep = append(keep, p.path, "-geometry", fmt.Sprintf("+%d+%d", p.at.X, p.at.Y), "-compose", "over", "-composite")
+		}
+		args := append([]string{holes, "(", "+clone", "-alpha", "extract", "("}, keep...)
+		args = append(args, ")", "-geometry", "+0+0", "-compose", "multiply", "-composite", ")", "-alpha", "off", "-compose", "CopyOpacity", "-composite", src)
+		if err := magick(inputs, args...); err != nil {
+			return err
+		}
+	}
 	var layers []string
 	for _, r := range radii {
 		l := filepath.Join(tmp, fmt.Sprintf("b%d.png", r))
-		if err := magick([]string{holes}, holes, "-channel", "RGBA", "-blur", fmt.Sprintf("0x%d", r), "-channel", "A", "-threshold", "0.1%", "+channel", l); err != nil {
+		if err := magick([]string{src}, src, "-channel", "RGBA", "-blur", fmt.Sprintf("0x%d", r), "-channel", "A", "-threshold", "0.1%", "+channel", l); err != nil {
 			return err
 		}
 		layers = append(layers, l)
