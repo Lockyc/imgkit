@@ -121,7 +121,7 @@ why    = "a hard coarse mask keeps foliage between hair strands; composited on n
 run    = ["cutout", "{asset:portrait-foliage.jpg}", "{tmp:cut.png}"]
 metric = "green-fringe"
 params = { image = "{tmp:cut.png}", region = "0.27,0.27,0.47,0.45", bg = "#062d5f" }
-max    = 1.0
+max    = 0.00015
 
 [[case]]
 name   = "cutout-hair-over-foliage-birefnet"
@@ -129,7 +129,7 @@ why    = "the Linux default coarse mask must reach the same edge quality"
 run    = ["cutout", "--coarse", "birefnet", "{asset:portrait-foliage.jpg}", "{tmp:cut.png}"]
 metric = "green-fringe"
 params = { image = "{tmp:cut.png}", region = "0.27,0.27,0.47,0.45", bg = "#062d5f" }
-max    = 1.0
+max    = 0.000089
 
 [[case]]
 name   = "cutout-fur-not-seethrough"
@@ -137,7 +137,7 @@ why    = "fur over a similar-coloured ground came out see-through with several m
 run    = ["cutout", "--coarse", "birefnet", "{asset:fur-matching-ground.jpg}", "{tmp:cut.png}"]
 metric = "seethrough"
 params = { image = "{tmp:cut.png}", solid = "0.45,0.40 0.62,0.36 0.84,0.48 0.84,0.82 0.70,0.88 0.52,0.80 0.45,0.58" }
-max    = 1.0
+max    = 0.001
 
 [[case]]
 name   = "cutout-tiles-match-whole-frame"
@@ -173,7 +173,7 @@ setup  = [["magick", "-size", "1521x1521", "xc:black", "-fill", "white", "-draw"
 run    = ["infill", "--mask", "{tmp:mask.png}", "{asset:flat-ground.jpg}", "{tmp:out.png}"]
 metric = "std-ratio"
 params = { a = "{tmp:out.png}", b = "{asset:flat-ground.jpg}", mask = "{tmp:mask.png}", ring = 40 }
-min    = 0.0
+min    = 0.27
 
 [[case]]
 name   = "inpaint-texture"
@@ -182,7 +182,7 @@ setup  = [["magick", "-size", "2000x1330", "xc:black", "-fill", "white", "-draw"
 run    = ["inpaint", "--mask", "{tmp:mask.png}", "{asset:detail-photo.jpg}", "{tmp:out.png}"]
 metric = "rmse"
 params = { a = "{tmp:out.png}", b = "{asset:detail-photo.jpg}", mask = "{tmp:mask.png}" }
-max    = 1.0
+max    = 0.21
 
 [[case]]
 name   = "synthesis-forbidden"
@@ -202,7 +202,7 @@ run    = ["upscale", "{tmp:small.png}", "{tmp:up.png}"]
 post   = [["magick", "{tmp:up.png}", "-resize", "2000x1330!", "{tmp:up-fit.png}"], ["magick", "{asset:detail-photo.jpg}", "{tmp:orig.png}"]]
 metric = "rmse"
 params = { a = "{tmp:up-fit.png}", b = "{tmp:orig.png}" }
-max    = 1.0
+max    = 0.076
 
 [[case]]
 name   = "grade-fit-recovers-treatment"
@@ -216,4 +216,4 @@ run    = ["grade", "fit", "--ref", "{tmp:ref.png}", "{tmp:subject.png}", "{tmp:h
 post   = [["imgkit", "grade", "apply", "--clut", "{tmp:hald.png}", "{tmp:subject.png}", "{tmp:graded.png}"]]
 metric = "rmse"
 params = { a = "{tmp:graded.png}", b = "{tmp:truth.png}", region = "0.25,0.25,0.5,0.5" }
-max    = 1.0
+max    = 0.0073
