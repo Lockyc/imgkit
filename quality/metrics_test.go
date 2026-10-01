@@ -120,3 +120,63 @@ func TestRMSEMask(t *testing.T) {
 		t.Error("unmasked rmse = 0, want the top-half difference")
 	}
 }
+
+func TestGreenFringeCompositing(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "h.png")
+	img := image.NewNRGBA(image.Rect(0, 0, 2, 1))
+	img.Set(0, 0, color.NRGBA{0, 200, 0, 128}) // half-alpha green
+	img.Set(1, 0, color.NRGBA{0, 200, 0, 5})   // under the 0.02 alpha gate
+	raster.SavePNG(p, img)
+	for _, c := range []struct {
+		bg   string
+		want float64
+	}{
+		{"#062d5f", 0.5}, // navy leaves the half-alpha pixel green-dominant
+		{"#ff00ff", 0},   // magenta bleeds through and cancels it
+	} {
+		v, err := Metrics["green-fringe"](Params{"image": p, "bg": c.bg})
+		if err != nil || v != c.want {
+			t.Errorf("bg %s: green-fringe = %v, %v; want %v", c.bg, v, err, c.want)
+		}
+	}
+}
+
+func TestGreenFringeEmptyRegion(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "e.png")
+	raster.SavePNG(p, image.NewNRGBA(image.Rect(0, 0, 4, 4)))
+	if v, err := Metrics["green-fringe"](Params{"image": p, "bg": "#000000", "region": "0,0,0.01,0.01"}); err == nil {
+		t.Errorf("zero-pixel region gave %v, want an error", v)
+	}
+}
+
+func TestRMSERejectsMaskWithRegion(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "a.png")
+	white := image.NewGray(image.Rect(0, 0, 4, 4))
+	for i := range white.Pix {
+		white.Pix[i] = 255
+	}
+	raster.SavePNG(p, white) // a full mask would otherwise succeed
+	if _, err := Metrics["rmse"](Params{"a": p, "b": p, "mask": p, "region": "0,0,1,1"}); err == nil {
+		t.Error("mask with region accepted, want an error")
+	}
+}
+
+func TestStdRatioErrors(t *testing.T) {
+	dir := t.TempDir()
+	big, small, mask := filepath.Join(dir, "b.png"), filepath.Join(dir, "s.png"), filepath.Join(dir, "m.png")
+	bi, mi := image.NewGray(image.Rect(0, 0, 10, 10)), image.NewGray(image.Rect(0, 0, 10, 10))
+	for y := 0; y < 10; y++ {
+		for x := 0; x < 10; x++ {
+			mi.SetGray(x, y, color.Gray{255}) // the mask is the whole frame: no ring
+		}
+	}
+	raster.SavePNG(big, bi)
+	raster.SavePNG(small, image.NewGray(image.Rect(0, 0, 5, 5)))
+	raster.SavePNG(mask, mi)
+	if v, err := Metrics["std-ratio"](Params{"a": big, "b": big, "mask": mask, "ring": int64(3)}); err == nil {
+		t.Errorf("empty ring gave %v, want an error", v)
+	}
+	if v, err := Metrics["std-ratio"](Params{"a": big, "b": small, "mask": mask}); err == nil {
+		t.Errorf("mismatched sizes gave %v, want an error", v)
+	}
+}

@@ -95,6 +95,9 @@ func rmse(p Params) (float64, error) {
 		return 0, fmt.Errorf("channels: want rgb or alpha")
 	}
 	if mp, err := p.Path("mask"); err == nil {
+		if _, ok := p["region"]; ok {
+			return 0, fmt.Errorf("mask and region cannot be combined")
+		}
 		mask, err := raster.Load(mp)
 		if err != nil {
 			return 0, err
@@ -228,6 +231,9 @@ func greenFringe(p Params) (float64, error) {
 			}
 		}
 	}
+	if total == 0 {
+		return 0, fmt.Errorf("the region selects no pixels")
+	}
 	return float64(n) / float64(total), nil
 }
 
@@ -290,6 +296,9 @@ func seethrough(p Params) (float64, error) {
 	if total == 0 {
 		return 0, fmt.Errorf("the solid polygon covers no pixels")
 	}
+	if total == 0 {
+		return 0, fmt.Errorf("the region selects no pixels")
+	}
 	return float64(n) / float64(total), nil
 }
 
@@ -326,6 +335,9 @@ func stdRatio(p Params) (float64, error) {
 		}
 	}
 	a, b, mask := imgs[0], imgs[1], imgs[2]
+	if a.Bounds() != b.Bounds() || a.Bounds() != mask.Bounds() {
+		return 0, fmt.Errorf("a, b and mask sizes differ")
+	}
 	ringF, err := p.Float("ring", 20)
 	if err != nil {
 		return 0, err
@@ -352,6 +364,9 @@ func stdRatio(p Params) (float64, error) {
 				around = append(around, luma(b, x, y))
 			}
 		}
+	}
+	if len(around) == 0 {
+		return 0, fmt.Errorf("the ring around the mask is empty")
 	}
 	s := std(around)
 	if s == 0 {

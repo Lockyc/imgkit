@@ -111,27 +111,7 @@ func RMSE(a, b *image.RGBA64, r image.Rectangle, ch Channels) (float64, error) {
 	if r.Empty() {
 		return 0, fmt.Errorf("empty region")
 	}
-	var sum float64
-	var n int
-	for y := r.Min.Y; y < r.Max.Y; y++ {
-		for x := r.Min.X; x < r.Max.X; x++ {
-			pa, pb := a.RGBA64At(x, y), b.RGBA64At(x, y)
-			if ch == Alpha {
-				d := (float64(pa.A) - float64(pb.A)) / 65535
-				sum += d * d
-				n++
-				continue
-			}
-			for _, d := range [3]float64{
-				float64(pa.R) - float64(pb.R), float64(pa.G) - float64(pb.G), float64(pa.B) - float64(pb.B),
-			} {
-				d /= 65535
-				sum += d * d
-				n++
-			}
-		}
-	}
-	return math.Sqrt(sum / float64(n)), nil
+	return rmse(a, b, r, nil, ch, "empty region")
 }
 
 // RMSEMasked is RMSE over the pixels where mask is more than half white.
@@ -139,20 +119,28 @@ func RMSEMasked(a, b, mask *image.RGBA64, ch Channels) (float64, error) {
 	if a.Bounds() != b.Bounds() || a.Bounds() != mask.Bounds() {
 		return 0, fmt.Errorf("sizes differ")
 	}
+	keep := func(x, y int) bool { return mask.RGBA64At(x, y).R > 0x7fff }
+	return rmse(a, b, a.Bounds(), keep, ch, "the mask selects no pixels")
+}
+
+// rmse accumulates the squared difference over the pixels of r that keep
+// accepts (all of them when keep is nil).
+func rmse(a, b *image.RGBA64, r image.Rectangle, keep func(x, y int) bool, ch Channels, none string) (float64, error) {
 	var sum float64
 	var n int
-	r := a.Bounds()
 	for y := r.Min.Y; y < r.Max.Y; y++ {
 		for x := r.Min.X; x < r.Max.X; x++ {
-			if mask.RGBA64At(x, y).R <= 0x7fff {
+			if keep != nil && !keep(x, y) {
 				continue
 			}
 			pa, pb := a.RGBA64At(x, y), b.RGBA64At(x, y)
-			ds := []float64{float64(pa.A) - float64(pb.A)}
+			ds := [3]float64{float64(pa.A) - float64(pb.A)}
+			k := 1
 			if ch == RGB {
-				ds = []float64{float64(pa.R) - float64(pb.R), float64(pa.G) - float64(pb.G), float64(pa.B) - float64(pb.B)}
+				ds = [3]float64{float64(pa.R) - float64(pb.R), float64(pa.G) - float64(pb.G), float64(pa.B) - float64(pb.B)}
+				k = 3
 			}
-			for _, d := range ds {
+			for _, d := range ds[:k] {
 				d /= 65535
 				sum += d * d
 				n++
@@ -160,7 +148,7 @@ func RMSEMasked(a, b, mask *image.RGBA64, ch Channels) (float64, error) {
 		}
 	}
 	if n == 0 {
-		return 0, fmt.Errorf("the mask selects no pixels")
+		return 0, fmt.Errorf("%s", none)
 	}
 	return math.Sqrt(sum / float64(n)), nil
 }
