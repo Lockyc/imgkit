@@ -301,6 +301,16 @@ params = { a = "{tmp:a.png}", b = "{tmp:b.png}", mask = "{tmp:mask.png}" }
 max    = 0.014
 
 [[case]]
+name   = "infill-edge-bleed-rail-specks"
+why    = "specks in the mask far down a tall frame must not make a hole 30 px above a dark rail darken toward it"
+setup  = [["magick", "{asset:flat-ground.jpg}", "(", "+clone", "-flip", ")", "(", "-clone", "0", ")", "-append", "+repage", "(", "-size", "1521x40", "xc:#2b2b2b", ")", "-geometry", "+0+940", "-compose", "multiply", "-composite", "{tmp:rail.png}"], ["magick", "-size", "1521x4563", "xc:black", "-fill", "white", "-draw", "circle 760,760 760,610", "-draw", "point 760,1700", "-draw", "point 760,2500", "-draw", "point 760,3300", "-draw", "point 760,4100", "{tmp:mask.png}"]]
+run    = ["infill", "--mask", "{tmp:mask.png}", "{tmp:rail.png}", "{tmp:out.png}"]
+post   = [["magick", "{tmp:out.png}", "-blur", "0x8", "{tmp:a.png}"], ["magick", "{tmp:rail.png}", "-blur", "0x8", "{tmp:b.png}"]]
+metric = "rmse"
+params = { a = "{tmp:a.png}", b = "{tmp:b.png}", mask = "{tmp:mask.png}" }
+max    = 0.014
+
+[[case]]
 name   = "inpaint-texture"
 why    = "LaMa must reconstruct a textured hole close to the original"
 setup  = [["magick", "-size", "2000x1330", "xc:black", "-fill", "white", "-draw", "circle 1000,665 1000,545", "{tmp:mask.png}"]]
