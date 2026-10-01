@@ -39,3 +39,19 @@ func TestFail(t *testing.T) {
 		t.Errorf("stderr %q", errb.String())
 	}
 }
+
+func TestFloatRefusesNonFinite(t *testing.T) {
+	for _, v := range []string{"NaN", "Inf", "-Inf"} {
+		var errb bytes.Buffer
+		fs := Flags("demo", "demo", &errb)
+		Float(fs, "x", 1, "a number")
+		if _, code, ok := Parse(fs, []string{"--x", v}, 0); ok || code != 2 {
+			t.Errorf("--x %s: code %d ok %v", v, code, ok)
+		}
+	}
+	fs := Flags("demo", "demo", &bytes.Buffer{})
+	x := Float(fs, "x", 1, "a number")
+	if _, _, ok := Parse(fs, []string{"--x", "2.5"}, 0); !ok || *x != 2.5 {
+		t.Fatalf("--x 2.5: ok %v x %v", ok, *x)
+	}
+}

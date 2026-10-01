@@ -134,7 +134,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	tol := fs.Uint("tolerance", 28, "per-pixel luma difference, 0-255, at or below which pixels count as equal")
 	maxShift := fs.Int("max-shift", 60, "px of vertical misalignment to search")
 	step := fs.Int("step", 2, "search granularity in px")
-	threshold := fs.Float64("threshold", 0, "exit 1 when more than this percent of pixels differ")
+	threshold := cli.Float(fs, "threshold", 0, "exit 1 when more than this percent of pixels differ")
 	outPath := fs.String("out", "", "write a picture of the changed pixels here (PNG)")
 	rest, code, ok := cli.Parse(fs, args, 2)
 	if !ok {

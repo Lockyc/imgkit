@@ -30,7 +30,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fs := cli.Flags("infill", usage, stderr)
 	mask := fs.String("mask", "", "white where the holes are, same size as the image (required)")
 	levels := fs.String("levels", "150,60,20,6", "blur radii in px, coarse to fine; the grain is the detail finer than the last")
-	grain := fs.Float64("grain", 1, "strength of the ground's grain laid over the fill: 1 matches the ground, 0 leaves it smooth")
+	grain := cli.Float(fs, "grain", 1, "strength of the ground's grain laid over the fill: 1 matches the ground, 0 leaves it smooth")
 	seed := fs.Int("seed", 1, "seed for which patches of the ground make the grain")
 	rest, code, ok := cli.Parse(fs, args, 2)
 	if !ok {

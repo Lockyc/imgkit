@@ -8,6 +8,8 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math"
+	"strconv"
 )
 
 // Flags makes the flag set for "imgkit <op>".
@@ -19,6 +21,35 @@ func Flags(op, usage string, stderr io.Writer) *flag.FlagSet {
 		fs.PrintDefaults()
 	}
 	return fs
+}
+
+// Float defines a float flag that refuses NaN and the infinities, which
+// flag.Float64 accepts and which slip past every range check.
+func Float(fs *flag.FlagSet, name string, value float64, usage string) *float64 {
+	p := new(float64)
+	*p = value
+	fs.Var((*finite)(p), name, usage)
+	return p
+}
+
+type finite float64
+
+func (f *finite) String() string { return strconv.FormatFloat(float64(*f), 'g', -1, 64) }
+
+func (f *finite) Set(s string) error {
+	v, ok := Finite(s)
+	if !ok {
+		return errors.New("want a finite number")
+	}
+	*f = finite(v)
+	return nil
+}
+
+// Finite parses s as a number, refusing NaN and the infinities, which
+// ParseFloat accepts.
+func Finite(s string) (float64, bool) {
+	v, err := strconv.ParseFloat(s, 64)
+	return v, err == nil && !math.IsNaN(v) && !math.IsInf(v, 0)
 }
 
 // Parse parses args and checks the positional count (any count when

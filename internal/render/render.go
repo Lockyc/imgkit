@@ -66,7 +66,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	pngOut := fs.String("png", "", "write a PNG screenshot here")
 	pdfOut := fs.String("pdf", "", "write a PDF here")
 	size := fs.String("size", "", "viewport and expected page size in CSS px, WxH (required with --png)")
-	scale := fs.Float64("scale", 1, "device scale factor; the PNG is size × scale px at 96 × scale dpi")
+	scale := cli.Float(fs, "scale", 1, "device scale factor; the PNG is size × scale px at 96 × scale dpi")
 	budget := fs.Int("budget", 5000, "virtual-time budget in ms for scripts, fonts and images to settle")
 	var failIf multi
 	fs.Var(&failIf, "fail-if", "fail when `TEXT` appears in the page: its markup (dumped DOM) for --png, its extracted text for --pdf (repeatable)")

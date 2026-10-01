@@ -76,22 +76,16 @@ func defaultCoarse() string {
 // isPair reports whether s is A:B with finite numbers A < B.
 func isPair(s string) bool {
 	a, b, ok := strings.Cut(s, ":")
-	x, e1 := finite(a)
-	y, e2 := finite(b)
+	x, e1 := cli.Finite(a)
+	y, e2 := cli.Finite(b)
 	return ok && e1 && e2 && x < y
 }
 
 func isNumber(s string) bool {
-	_, ok := finite(s)
+	_, ok := cli.Finite(s)
 	return ok
 }
 
-// finite parses s as a number, refusing NaN and the infinities, which
-// ParseFloat accepts.
-func finite(s string) (float64, bool) {
-	v, err := strconv.ParseFloat(s, 64)
-	return v, err == nil && !math.IsNaN(v) && !math.IsInf(v, 0)
-}
 
 type job struct {
 	in, out, coarse         string
