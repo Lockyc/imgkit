@@ -44,3 +44,14 @@ func TestQRRefuses(t *testing.T) {
 		}
 	}
 }
+
+func TestQRValidatesFgBeforeBg(t *testing.T) {
+	enginetest.Stub(t, "qrencode", `exit 0`)
+	out := filepath.Join(t.TempDir(), "qr.svg")
+	for i := 0; i < 20; i++ {
+		var o, e bytes.Buffer
+		if code := Main(context.Background(), []string{"--fg", "zz", "--bg", "yy", "-o", out, "x"}, &o, &e); code != 2 || !strings.Contains(e.String(), "--fg") {
+			t.Fatalf("code %d stderr %q", code, e.String())
+		}
+	}
+}

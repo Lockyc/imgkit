@@ -58,6 +58,9 @@ func TestFontsRejects(t *testing.T) {
 		{[]string{"-o", out, ttf + `:A"B:400:normal`}, 2, "family"},
 		{[]string{"-o", out, filepath.Join(dir, "a.eot") + ":A:400:normal"}, 2, ".eot"},
 		{[]string{"-o", out, filepath.Join(dir, "missing.woff2") + ":A:400:normal"}, 1, "missing.woff2"},
+		{[]string{"-o", out, ttf + ":A\nB:400:normal"}, 2, "family"},
+		{[]string{"-o", out, ttf + ":A\x7fB:400:normal"}, 2, "family"},
+		{[]string{"--display", "block;}", "-o", out, ttf + ":A:400:normal"}, 2, "--display"},
 		{[]string{ttf + ":A:400:normal"}, 2, "-o"},
 		{[]string{"-o", ttf, ttf + ":A:400:normal"}, 2, "same file"},
 	}

@@ -51,9 +51,9 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if !strings.Contains("LMQH", *ec) || len(*ec) != 1 {
 		return usageErr("--ec %q: use L, M, Q or H", *ec)
 	}
-	for name, v := range map[string]string{"--fg": *fg, "--bg": *bg} {
-		if !hexRe.MatchString(v) {
-			return usageErr("%s %q: want RRGGBB", name, v)
+	for _, c := range []struct{ name, v string }{{"--fg", *fg}, {"--bg", *bg}} {
+		if !hexRe.MatchString(c.v) {
+			return usageErr("%s %q: want RRGGBB", c.name, c.v)
 		}
 	}
 	f, b := strings.ToUpper(*fg), strings.ToUpper(*bg)

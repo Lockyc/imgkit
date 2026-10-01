@@ -12,12 +12,17 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/lockyc/imgkit/internal/cli"
 	"github.com/lockyc/imgkit/internal/engine"
 )
+
+// displays are the font-display values CSS defines.
+var displays = []string{"auto", "block", "swap", "fallback", "optional"}
 
 const usage = "fonts [--display block] -o fonts.css FILE:FAMILY:WEIGHT:STYLE..."
 
@@ -39,8 +44,8 @@ func parseFace(s string) (face, error) {
 		return face{}, fmt.Errorf("%q: want FILE:FAMILY:WEIGHT:STYLE", s)
 	}
 	f := face{file: strings.Join(parts[:n-3], ":"), family: parts[n-3], weight: parts[n-2], style: parts[n-1]}
-	if f.family == "" || strings.ContainsAny(f.family, `"\`) {
-		return face{}, fmt.Errorf("%q: family must be non-empty, without quotes or backslashes", s)
+	if f.family == "" || strings.ContainsAny(f.family, `"\`) || strings.IndexFunc(f.family, unicode.IsControl) >= 0 {
+		return face{}, fmt.Errorf("%q: family must be non-empty, without quotes, backslashes or control characters", s)
 	}
 	if w, err := strconv.Atoi(f.weight); (err != nil || w < 1 || w > 1000) && f.weight != "normal" && f.weight != "bold" {
 		return face{}, fmt.Errorf("%q: weight must be 1-1000, normal or bold", s)
@@ -66,6 +71,9 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	usageErr := func(err error) int { fmt.Fprintf(stderr, "imgkit fonts: %v\n", err); return 2 }
 	if *out == "" || len(rest) == 0 {
 		return usageErr(fmt.Errorf("give -o and at least one FILE:FAMILY:WEIGHT:STYLE"))
+	}
+	if !slices.Contains(displays, *display) {
+		return usageErr(fmt.Errorf("--display %q: use %s", *display, strings.Join(displays, ", ")))
 	}
 	var faces []face
 	for _, s := range rest {
