@@ -9,3 +9,35 @@ source  = "https://www.color.org/registry/profiles/Coated_Fogra39L_VIGC_300.icc"
 author  = "VIGC (Flemish Innovation Centre for Graphic Communication), ICC profile registry"
 licence = "May be used, embedded, exchanged, and shared without restriction (ICC profile registry terms)"
 sha256  = "6df43849a84d2632e7900a125f657bd09364ed56775bc4740c1e39a5492d47e3"
+
+[[asset]]
+file    = "portrait-foliage.jpg"
+source  = "https://commons.wikimedia.org/wiki/File:Allef_Vinicius_2016-09-16_(Unsplash_5GyVnouGxqM).jpg"
+author  = "Allef Vinicius (Unsplash)"
+licence = "CC0"
+recipe  = "magick SOURCE -resize x2400 -crop 1800x2400+750+0 +repage -quality 90 -strip portrait-foliage.jpg"
+sha256  = "2ed7e49de36d930be63820d486072b494667627aca07df109646691288626937"
+
+[[asset]]
+file    = "fur-matching-ground.jpg"
+source  = "https://commons.wikimedia.org/wiki/File:Renard_polaire_DSCF2606.jpg"
+author  = "Musicaline"
+licence = "CC BY-SA 4.0"
+recipe  = "resized by imgkit: magick SOURCE -resize 1600x1600 -quality 92 -strip fur-matching-ground.jpg"
+sha256  = "347f465e2a2add4afde3776647519042cb6d04f14f23a398391d2fe2ac906ba3"
+
+[[asset]]
+file    = "flat-ground.jpg"
+source  = "https://commons.wikimedia.org/wiki/File:Mustard_rough_cast_finish_clean_seamless_building_plaster_wall_texture.jpg"
+author  = "Sisters.seamless"
+licence = "CC0"
+recipe  = "magick SOURCE -quality 92 -strip flat-ground.jpg"
+sha256  = "dbb2fc2b20007f19d6d97a9a2a8cb8dc956c43284a3afefaa05a7d435f38d215"
+
+[[asset]]
+file    = "detail-photo.jpg"
+source  = "https://commons.wikimedia.org/wiki/File:Coulored_coth_with_embroidery,_detail,_Crafts_Museum,_Delhi.jpg"
+author  = "Yann (User:Yann on Wikimedia Commons)"
+licence = "CC BY-SA 4.0"
+recipe  = "resized by imgkit: magick SOURCE -resize 2000x2000 -quality 90 -strip detail-photo.jpg"
+sha256  = "d46e69b1e4e63bffdf15e7dad7735b89061159d1642e3531271860d6b54a4b4e"
