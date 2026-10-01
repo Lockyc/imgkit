@@ -40,12 +40,11 @@ type piece struct {
 	at   image.Point
 }
 
-// component is one connected hole: its label in the label map, its
-// bounding box and its area in pixels.
+// component is one connected hole: its label in the label map and its
+// bounding box.
 type component struct {
 	label int32
 	box   image.Rectangle
-	area  int
 }
 
 // texture reads holes (the image, transparent where the holes are) and fill
@@ -133,7 +132,6 @@ func label(holes image.RGBA64Image) ([]int32, []component) {
 			stack = stack[:len(stack)-1]
 			x, y := i%w, i/w
 			c.box = c.box.Union(image.Rect(x, y, x+1, y+1))
-			c.area++
 			for dy := -1; dy <= 1; dy++ {
 				for dx := -1; dx <= 1; dx++ {
 					nx, ny := x+dx, y+dy

@@ -15,13 +15,15 @@ import (
 // wall, a frame around a print) bleeds into it. A flood from the pixels
 // bordering the hole runs through known pixels whose gradient, on a light
 // blur of the known pixels, is at most stopK robust std-devs above the
-// median gradient in a ring around the hole. Each connected part the flood
-// misses is cut off from the blur levels only if it is another ground: at
-// least as large as the smallest hole it could feed (a smaller part cannot
-// outweigh the ring in a blur that spans both), with some of it below the
-// limit, and that part's median tone more than stopK robust std-devs
-// from the ring's. Specks, fibres and the pockets they enclose are the
-// hole's own ground and stay. A hole that straddles an edge touches both
+// median gradient in a ring around the hole. Each connected part of the
+// ground the flood misses (pixels at or below the limit) is cut off from the
+// blur levels only if it is another ground: its median tone is more than
+// stopK robust std-devs from the ring's, and that difference times its share
+// of the crop's known pixels (its weight in a blur spanning the crop) is at
+// least one 8-bit level, so it would visibly shift the fill. The edge pixels
+// joined to a cut-off part go with it. So a rail with the hole's own ground
+// beyond it is cut off and that ground is kept; specks, fibres and the
+// pockets they enclose stay. A hole that straddles an edge touches both
 // grounds, so it keeps both.
 const (
 	stopK = 4.0 // gradient threshold, in robust std-devs above the ring's median
@@ -43,11 +45,7 @@ func edgeStops(holesPath, dir string, smooth float64, reach int) ([]piece, error
 	labels, comps := label(holes)
 	var pieces []piece
 	for i, cl := range cluster(comps, reach, holes.Bounds()) {
-		smallest := cl.members[0].area
-		for _, m := range cl.members {
-			smallest = min(smallest, m.area)
-		}
-		drop := stopped(holes, labels, cl.region, smooth, smallest)
+		drop := stopped(holes, labels, cl.region, smooth)
 		if drop == nil {
 			continue
 		}
@@ -60,10 +58,10 @@ func edgeStops(holesPath, dir string, smooth float64, reach int) ([]piece, error
 	return pieces, nil
 }
 
-// stopped floods region r from its holes' borders and returns the parts it
-// missed that are another ground of at least minPart pixels, black on
-// transparent, or nil if there are none.
-func stopped(holes image.RGBA64Image, labels []int32, r image.Rectangle, smooth float64, minPart int) *image.NRGBA {
+// stopped floods region r from its holes' borders and returns the missed
+// parts that are another ground, with the edge pixels joined to them, black
+// on transparent, or nil if there are none.
+func stopped(holes image.RGBA64Image, labels []int32, r image.Rectangle, smooth float64) *image.NRGBA {
 	fb := holes.Bounds()
 	w, h := r.Dx(), r.Dy()
 	n := w * h
@@ -138,34 +136,55 @@ func stopped(holes image.RGBA64Image, labels []int32, r image.Rectangle, smooth 
 		}
 	}
 	flood(seeds, w, h, func(i int) bool { return known[i] && !reached[i] && grad[i] <= limit }, func(i int) { reached[i] = true })
-	// A missed part holding no ground below the limit is an edge line or a
-	// speck; one smaller than minPart, or of the ring's tone, is a pocket of
-	// the same ground. An edge line goes with the ground it joins.
+	// The flood misses ground pixels (at or below the limit) and edge pixels
+	// (above it). Each connected part of the missed ground is judged on its
+	// own: it is another ground if its tone is off the ring's by more than
+	// the spread and by enough, weighted by its size, to shift the fill a
+	// level; otherwise it is a pocket of the same ground.
+	// The edge pixels joined to a cut-off part then go with it; edge pixels
+	// joined to none (specks, fibres, an edge line between two kept grounds)
+	// stay.
+	nKnown := 0
+	for _, k := range known {
+		if k {
+			nKnown++
+		}
+	}
+	missedGround := func(i int) bool { return known[i] && !reached[i] && grad[i] <= limit }
 	seen := make([]bool, n)
-	var drop *image.NRGBA
+	cut := make([]bool, n)
+	var cutOff []int
 	for start := range known {
-		if !known[start] || reached[start] || seen[start] {
+		if !missedGround(start) || seen[start] {
 			continue
 		}
 		seen[start] = true
 		part := []int{start}
-		flood([]int{start}, w, h, func(i int) bool { return known[i] && !reached[i] && !seen[i] }, func(i int) {
+		flood([]int{start}, w, h, func(i int) bool { return missedGround(i) && !seen[i] }, func(i int) {
 			seen[i] = true
 			part = append(part, i)
 		})
-		var flat []float64
-		for _, i := range part {
-			if grad[i] <= limit {
-				flat = append(flat, float64(lo[i]))
-			}
+		tones := make([]float64, len(part))
+		for k, i := range part {
+			tones[k] = float64(lo[i])
 		}
-		if len(flat) < minPart || math.Abs(median(flat)-ground) <= spread {
+		off := math.Abs(median(tones) - ground)
+		if off <= spread || off*float64(len(part))/float64(nKnown) < minStop {
+
 			continue
 		}
-		if drop == nil {
-			drop = image.NewNRGBA(image.Rect(0, 0, w, h))
-		}
 		for _, i := range part {
+			cut[i] = true
+		}
+		cutOff = append(cutOff, part...)
+	}
+	if len(cutOff) == 0 {
+		return nil
+	}
+	flood(cutOff, w, h, func(i int) bool { return known[i] && !reached[i] && !cut[i] && grad[i] > limit }, func(i int) { cut[i] = true })
+	drop := image.NewNRGBA(image.Rect(0, 0, w, h))
+	for i, c := range cut {
+		if c {
 			drop.SetNRGBA(i%w, i/w, color.NRGBA{0, 0, 0, 255})
 		}
 	}

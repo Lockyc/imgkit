@@ -153,3 +153,46 @@ func TestEdgeStopsKeepTheSameGroundBeyondALine(t *testing.T) {
 		t.Errorf("pieces %v, err %v; want none beyond a line in one ground", pieces, err)
 	}
 }
+
+// A dark rail 30 px below the hole, with the hole's own ground below it, is
+// cut off; the ground beyond it is not.
+func TestEdgeStopsCutOffARailNotTheGroundBeyond(t *testing.T) {
+	const w, h, top, bottom = 400, 400, 230, 270
+	in := disc(200, 160, 40)
+	holes, _ := ground(t, t.TempDir(), w, h, func(x, y int) (int, int) {
+		if y >= top && y < bottom {
+			return 30, 10
+		}
+		return 160, 20
+	}, in)
+	cut := dropped(t, holes, w, h)
+	if f := frac(w, h, cut, func(x, y int) bool { return y >= top+5 && y < bottom-5 }); f < 0.99 {
+		t.Errorf("%.3f of the rail is cut off, want all of it", f)
+	}
+	for name, side := range map[string]func(x, y int) bool{
+		"above": func(x, y int) bool { return y < top-5 && !in(x, y) },
+		"below": func(x, y int) bool { return y >= bottom+5 },
+	} {
+		if f := frac(w, h, cut, side); f > 0.1 {
+			t.Errorf("%.3f of the ground %s the rail is cut off, want under 0.1", f, name)
+		}
+	}
+}
+
+// A one-pixel speck in the mask near a hole in paper does not make the
+// paper's fibre pockets count as another ground.
+func TestEdgeStopsIgnoreAStraySpeck(t *testing.T) {
+	src, err := raster.Load(holed(t, filepath.Join("..", "..", "quality", "assets", "paper-ground.jpg"), 800, 800, 150))
+	if err != nil {
+		t.Fatal(err)
+	}
+	src.SetRGBA64(1150, 800, color.RGBA64{})
+	holes := filepath.Join(t.TempDir(), "holes.png")
+	if err := raster.SavePNG(holes, src); err != nil {
+		t.Fatal(err)
+	}
+	pieces, err := edgeStops(holes, t.TempDir(), 3, 450)
+	if err != nil || pieces != nil {
+		t.Errorf("pieces %v, err %v; want none with no edge", pieces, err)
+	}
+}
