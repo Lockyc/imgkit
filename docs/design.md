@@ -140,8 +140,8 @@ ONNX Runtime), so `cutout` and `upscale` refuse before uv runs; `grade fit`
 needs macOS 14 or later there, and `inpaint`, whose iopaint resolves its own
 older PyTorch there, is untested. No command depends on GNU-only flags. An
 operation that cannot do the job fails with the measured reason ("no
-foreground found", "render would be … px, beyond the … px verified whole"), and never leaves a
-plausible-looking wrong file behind.
+foreground found", "render would be … px, beyond the … px verified
+whole"), and never leaves a plausible-looking wrong file behind.
 
 ## Quality
 
