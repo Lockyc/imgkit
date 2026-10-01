@@ -63,10 +63,13 @@ func TestInfill(t *testing.T) {
 			if slices.Contains(calls[3], "+noise") {
 				t.Errorf("fill adds magick noise: %q", calls[3])
 			}
-			want := map[string]string{"1": "grained.png", "0": "fill.png"}[grain]
 			comp := calls[4]
-			if filepath.Base(comp[0]) != "holes.png" || filepath.Base(comp[1]) != want || comp[len(comp)-1] != out {
-				t.Errorf("composite takes %q, want holes.png, %s, then %s", comp, want, out)
+			if filepath.Base(comp[0]) != "holes.png" || filepath.Base(comp[2]) != "fill.png" || comp[len(comp)-1] != out {
+				t.Errorf("composite takes %q, want holes.png, the fill, then %s", comp, out)
+			}
+			pieces := slices.ContainsFunc(comp, func(a string) bool { return strings.HasPrefix(filepath.Base(a), "grain") })
+			if pieces != (grain == "1") {
+				t.Errorf("grain %s: composite has grained pieces = %v: %q", grain, pieces, comp)
 			}
 		})
 	}
@@ -115,6 +118,20 @@ func TestInfillRefusesSameFile(t *testing.T) {
 	}
 	if after, _ := os.ReadFile(mask); !bytes.Equal(mbefore, after) {
 		t.Error("mask changed")
+	}
+	if len(enginetest.Calls(t, log)) != 0 {
+		t.Error("magick ran")
+	}
+}
+
+func TestInfillRefusesNegativeGrain(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	log := enginetest.Stub(t, "magick", `exit 0`)
+	in, mask := pngOf(t, dir, "in.png", 40, 30), pngOf(t, dir, "m.png", 40, 30)
+	var o, e bytes.Buffer
+	if code := Main(context.Background(), []string{"--mask", mask, "--grain", "-0.5", in, filepath.Join(dir, "out.png")}, &o, &e); code != 2 || !strings.Contains(e.String(), "--grain of 0 or more") {
+		t.Errorf("code %d, %q", code, e.String())
 	}
 	if len(enginetest.Calls(t, log)) != 0 {
 		t.Error("magick ran")

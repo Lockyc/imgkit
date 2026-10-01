@@ -109,15 +109,22 @@ func run(ctx context.Context, in, mask, out string, radii []int, grain float64, 
 	if err := magick(layers, append(args, "-alpha", "off", fill)...); err != nil {
 		return err
 	}
+	var pieces []piece
 	if grain > 0 {
 		// The finest level is the scale the fill already follows, so the
 		// grain is the detail finer than it.
-		grained := filepath.Join(tmp, "grained.png")
-		if err := texture(holes, fill, grained, float64(radii[len(radii)-1]), grain, seed); err != nil {
+		if pieces, err = texture(holes, fill, tmp, float64(radii[len(radii)-1]), grain, seed); err != nil {
 			return err
 		}
-		fill = grained
 	}
-	// holes first, so the result keeps the source's bit depth.
-	return magick([]string{holes, fill}, holes, fill, "-compose", "dst-over", "-composite", "-alpha", "off", out)
+	// holes first, so the result keeps the source's bit depth; the grained
+	// pieces go over the fill at their offsets, then the fill under holes.
+	inputs := []string{holes, fill}
+	args = []string{holes, "(", fill}
+	for _, p := range pieces {
+		inputs = append(inputs, p.path)
+		args = append(args, p.path, "-geometry", fmt.Sprintf("+%d+%d", p.at.X, p.at.Y), "-compose", "over", "-composite")
+	}
+	args = append(args, ")", "-geometry", "+0+0", "-compose", "dst-over", "-composite", "-alpha", "off", out)
+	return magick(inputs, args...)
 }
