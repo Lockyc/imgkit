@@ -12,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/lockyc/imgkit/internal/diff"
 	"github.com/lockyc/imgkit/internal/doctor"
 	"github.com/lockyc/imgkit/internal/press"
 	"github.com/lockyc/imgkit/internal/render"
@@ -29,6 +30,7 @@ var commands = []command{
 	{"doctor", "check every engine; --install fetches the ones imgkit manages", doctor.Main},
 	{"render", "HTML to PNG and/or PDF with headless Chrome", render.Main},
 	{"press", "PDF to a print master: outlined text, CMYK, checked against a soft proof", press.Main},
+	{"diff", "compare two images after lining them up vertically", diff.Main},
 }
 
 func main() {
