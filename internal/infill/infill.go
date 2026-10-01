@@ -76,6 +76,9 @@ func run(ctx context.Context, in, mask, out string, radii []int, grain float64, 
 	// Oriented as displayed, so a mask drawn on the displayed image lines
 	// up, and otherwise as stored: the result keeps the source's bit depth
 	// and profile.
+	if err := frame.RequireOpaque(ctx, in); err != nil {
+		return err
+	}
 	img, m := filepath.Join(tmp, "in.png"), filepath.Join(tmp, "mask.png")
 	if err := frame.Orient(ctx, in, img); err != nil {
 		return err

@@ -68,6 +68,9 @@ func run(ctx context.Context, in, mask, out string) error {
 	if err := os.Mkdir(outDir, 0o755); err != nil {
 		return err
 	}
+	if err := frame.RequireOpaque(ctx, in); err != nil {
+		return err
+	}
 	if err := frame.Write(ctx, in, src, frame.Options{Opaque: true}); err != nil {
 		return err
 	}

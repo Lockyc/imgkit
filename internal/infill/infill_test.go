@@ -46,6 +46,26 @@ func holedPNG(t *testing.T, dir string, w, h int, band bool) string {
 	return p
 }
 
+// calls is the stub's log less the opacity checks, which every run makes
+// first.
+func calls(t *testing.T, log string) [][]string {
+	return slices.DeleteFunc(enginetest.Calls(t, log), func(c []string) bool { return c[0] == "identify" })
+}
+
+func TestInfillRefusesTransparentSource(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	t.Setenv("OPAQUE", "False")
+	log := enginetest.Stub(t, "magick", orientStub)
+	var o, e bytes.Buffer
+	if code := Main(context.Background(), []string{"--mask", pngOf(t, dir, "m.png", 40, 30), pngOf(t, dir, "in.png", 40, 30), filepath.Join(dir, "out.png")}, &o, &e); code != 1 || !strings.Contains(e.String(), "transparent") {
+		t.Errorf("code %d, %q", code, e.String())
+	}
+	if n := len(calls(t, log)); n != 0 {
+		t.Errorf("%d magick calls after the refusal", n)
+	}
+}
+
 func TestInfill(t *testing.T) {
 	for _, c := range []struct {
 		grain string
@@ -55,13 +75,14 @@ func TestInfill(t *testing.T) {
 			dir := t.TempDir()
 			t.Chdir(dir)
 			t.Setenv("FIXTURE", holedPNG(t, dir, 80, 60, c.band))
-			log := enginetest.Stub(t, "magick", `for a in "$@"; do last=$a; done; cp "$FIXTURE" "$last"`)
+			log := enginetest.Stub(t, "magick", `[ "$1" = identify ] && { echo "${OPAQUE:-True}"; exit 0; }
+for a in "$@"; do last=$a; done; cp "$FIXTURE" "$last"`)
 			in, mask, out := pngOf(t, dir, "in.png", 80, 60), pngOf(t, dir, "m.png", 80, 60), filepath.Join(dir, "out.png")
 			var o, e bytes.Buffer
 			if code := Main(context.Background(), []string{"--mask", mask, "--levels", "30,6", "--grain", c.grain, in, out}, &o, &e); code != 0 {
 				t.Fatalf("code %d: %s", code, e.String())
 			}
-			calls := enginetest.Calls(t, log)
+			calls := calls(t, log)
 			// The image and mask are oriented as displayed, nothing else,
 			// and the holes are cut from those copies.
 			if len(calls) < 3 || !slices.Equal(calls[0][:2], []string{in, "-auto-orient"}) || !slices.Equal(calls[1][:2], []string{mask, "-auto-orient"}) ||
@@ -103,8 +124,10 @@ func TestInfill(t *testing.T) {
 
 // orientStub plays magick: an -auto-orient call copies its input, or the
 // image at $ROT for in.png when ROT is set, playing a source whose EXIF
-// rotation turns it; any other call fails with status 3.
-const orientStub = `for a in "$@"; do last=$a; done
+// rotation turns it; identify answers opaque; any other call fails with
+// status 3.
+const orientStub = `[ "$1" = identify ] && { echo "${OPAQUE:-True}"; exit 0; }
+for a in "$@"; do last=$a; done
 [ "$2" = -auto-orient ] || exit 3
 src=$1; [ -n "$ROT" ] && [ "$(basename "$1")" = in.png ] && src=$ROT
 cp "$src" "$last"`
@@ -119,7 +142,7 @@ func TestInfillRotatedSource(t *testing.T) {
 	in, mask := pngOf(t, dir, "in.png", 40, 30), pngOf(t, dir, "m.png", 30, 40)
 	var o, e bytes.Buffer
 	Main(context.Background(), []string{"--mask", mask, in, filepath.Join(dir, "out.png")}, &o, &e)
-	if strings.Contains(e.String(), "the mask is") || len(enginetest.Calls(t, log)) != 3 {
+	if strings.Contains(e.String(), "the mask is") || len(calls(t, log)) != 3 {
 		t.Errorf("rotated source refused before the holes: %q", e.String())
 	}
 }
@@ -133,7 +156,7 @@ func TestInfillRefuses(t *testing.T) {
 	if code := Main(context.Background(), []string{"--mask", pngOf(t, dir, "m.png", 41, 30), in, out}, &o, &e); code != 1 || !strings.Contains(e.String(), "41x30") {
 		t.Errorf("mismatched mask: code %d, %q", code, e.String())
 	}
-	if n := len(enginetest.Calls(t, log)); n != 2 {
+	if n := len(calls(t, log)); n != 2 {
 		t.Errorf("%d magick calls for a mismatched mask, want the two orients", n)
 	}
 	if code := Main(context.Background(), []string{"--mask", pngOf(t, dir, "m2.png", 40, 30), "--levels", "6,20", in, out}, &o, &e); code != 2 {
@@ -144,7 +167,7 @@ func TestInfillRefuses(t *testing.T) {
 	if code := Main(context.Background(), []string{"--mask", pngOf(t, dir, "m3.png", 40, 30), in, out}, &o, &e); code != 1 || !strings.Contains(e.String(), "forbid") {
 		t.Errorf("forbidden: code %d, %q", code, e.String())
 	}
-	if n := len(enginetest.Calls(t, log)); n != 2 {
+	if n := len(calls(t, log)); n != 2 {
 		t.Errorf("magick ran %d times for refused infills, want only the mismatched mask's two orients", n)
 	}
 }
@@ -171,7 +194,7 @@ func TestInfillRefusesSameFile(t *testing.T) {
 	if after, _ := os.ReadFile(mask); !bytes.Equal(mbefore, after) {
 		t.Error("mask changed")
 	}
-	if len(enginetest.Calls(t, log)) != 0 {
+	if len(calls(t, log)) != 0 {
 		t.Error("magick ran")
 	}
 }
@@ -185,7 +208,7 @@ func TestInfillRefusesNegativeGrain(t *testing.T) {
 	if code := Main(context.Background(), []string{"--mask", mask, "--grain", "-0.5", in, filepath.Join(dir, "out.png")}, &o, &e); code != 2 || !strings.Contains(e.String(), "--grain of 0 or more") {
 		t.Errorf("code %d, %q", code, e.String())
 	}
-	if len(enginetest.Calls(t, log)) != 0 {
+	if len(calls(t, log)) != 0 {
 		t.Error("magick ran")
 	}
 }

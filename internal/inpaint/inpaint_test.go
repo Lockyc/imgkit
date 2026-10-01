@@ -26,7 +26,8 @@ func pngOf(t *testing.T, dir, name string, w, h int) string {
 // --output under its own name, and answers the device probe with mps.
 func stubs(t *testing.T) (magick, uv string) {
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
-	return enginetest.Stub(t, "magick", `for a in "$@"; do last=$a; done
+	return enginetest.Stub(t, "magick", `[ "$1" = identify ] && { echo "${OPAQUE:-True}"; exit 0; }
+for a in "$@"; do last=$a; done
 src=$1; [ -n "$ROT" ] && [ "$(basename "$1")" = in.png ] && src=$ROT
 cp "$src" "${last#PNG24:}"`), enginetest.Stub(t, "uv", `[ "$7" = python ] && { echo mps; exit 0; }
 img=; out=
@@ -44,6 +45,10 @@ func TestInpaint(t *testing.T) {
 		t.Fatalf("code %d: %s", code, e.String())
 	}
 	m := enginetest.Calls(t, magick)
+	if len(m) != 4 || m[0][0] != "identify" {
+		t.Fatalf("%d magick calls, want the opacity check, frame, mask, output: %q", len(m), m)
+	}
+	m = m[1:]
 	if len(m) != 3 {
 		t.Fatalf("%d magick calls, want frame, mask, output: %q", len(m), m)
 	}
@@ -137,5 +142,19 @@ func TestInpaintRefusesSameFile(t *testing.T) {
 	}
 	if len(enginetest.Calls(t, magick))+len(enginetest.Calls(t, log)) != 0 {
 		t.Error("an engine ran")
+	}
+}
+
+func TestInpaintRefusesTransparentSource(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	_, log := stubs(t)
+	t.Setenv("OPAQUE", "False")
+	var o, e bytes.Buffer
+	if code := Main(context.Background(), []string{"--mask", pngOf(t, dir, "m.png", 40, 30), pngOf(t, dir, "in.png", 40, 30), filepath.Join(dir, "out.png")}, &o, &e); code != 1 || !strings.Contains(e.String(), "transparent") {
+		t.Errorf("code %d, %q", code, e.String())
+	}
+	if len(enginetest.Calls(t, log)) != 0 {
+		t.Error("iopaint ran on a transparent source")
 	}
 }

@@ -8,7 +8,9 @@ package frame
 
 import (
 	"context"
+	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/lockyc/imgkit/internal/engine"
 	"github.com/lockyc/imgkit/internal/icc"
@@ -67,4 +69,18 @@ func OrientArgs(in, out string) []string { return append(oriented(in), out) }
 func Orient(ctx context.Context, in, out string) error {
 	_, err := engine.Run(ctx, engine.Cmd{Engine: "magick", Args: OrientArgs(in, out), Inputs: []string{in}, Outputs: []string{out}})
 	return err
+}
+
+// RequireOpaque refuses a source with any transparent pixel, for an
+// operation that reads every pixel as picture and writes an opaque result:
+// it would fill from the colour stored under the transparency and show it.
+func RequireOpaque(ctx context.Context, in string) error {
+	res, err := engine.Run(ctx, engine.Cmd{Engine: "magick", Args: []string{"identify", "-format", "%[opaque]\n", in}, Inputs: []string{in}})
+	if err != nil {
+		return err
+	}
+	if !strings.HasPrefix(strings.TrimSpace(string(res.Stdout)), "True") {
+		return fmt.Errorf("%s has transparent pixels; flatten it onto its background first", in)
+	}
+	return nil
 }
