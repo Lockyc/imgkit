@@ -76,3 +76,22 @@ Phases run in order. Within a phase, order is open.
   because no measured case has such a source. Unlock: a `quality/` case
   with a cut-out over junk RGB, then the colour extended under the
   transparency before enlarging, measured on it.
+- **press soft-proof default unproven.** `defaultMaxRMSE` sits above
+  the 0.083 its docblock gives for a master with a hidden element, and no
+  `quality/` case presses a broken master, so the default gate is not shown
+  to fail. Deferred because the artboards it was calibrated on are not in
+  the tree. Unlock: a `quality/` case pressing a master with an element
+  removed, measured beside `press-clean-master`, then the default and the
+  docblock set from those two numbers.
+- **qr contrast floor.** `qr` refuses light-on-dark but accepts any darker
+  fg, so `--fg 7F7F7F --bg 808080` writes a code no camera reads. Deferred
+  because no case measures where decoding fails. Unlock: `qr-decodes` cases
+  at falling contrast, then a minimum contrast ratio set below the last
+  pass.
+- **infill memory on scattered holes.** Holes whose crops overlap share
+  one crop (`cluster` in internal/infill), so dust specks a few hundred px
+  apart chain into a crop the size of the frame, and the edge-stop and
+  texture passes allocate over all of it. Deferred because no measured
+  case has many small holes on a large scan. Unlock: a `quality/` case of
+  scattered specks on a large frame with its peak memory recorded, then
+  per-component crops measured on it.
