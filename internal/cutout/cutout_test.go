@@ -211,7 +211,7 @@ func TestCutoutRefusesUpsample(t *testing.T) {
 func TestCutoutNoForeground(t *testing.T) {
 	e := setup(t)
 	t.Setenv("FIXTURE_MASK", png(t, color.Black))
-	if code := e.run("--coarse", "birefnet"); code != 1 || !strings.Contains(e.stderr.String(), "no foreground") {
+	if code := e.run("--coarse", "birefnet"); code != 1 || !strings.Contains(e.stderr.String(), "no foreground") || !strings.Contains(e.stderr.String(), "try --coarse vision") {
 		t.Fatalf("code %d, stderr %q", code, e.stderr.String())
 	}
 }
@@ -271,12 +271,12 @@ func TestInputEqualToOutputIsRefused(t *testing.T) {
 	}
 }
 
-// maskFile writes a 100x100 grey mask whose value at (x, y) is v(x, y).
-func maskFile(t *testing.T, v func(x, y int) uint8) string {
+// maskFile writes a w×h grey mask whose value at (x, y) is v(x, y).
+func maskFile(t *testing.T, w, h int, v func(x, y int) uint8) string {
 	t.Helper()
-	img := image.NewGray(image.Rect(0, 0, 100, 100))
-	for y := 0; y < 100; y++ {
-		for x := 0; x < 100; x++ {
+	img := image.NewGray(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
 			img.SetGray(x, y, color.Gray{v(x, y)})
 		}
 	}
@@ -287,41 +287,60 @@ func maskFile(t *testing.T, v func(x, y int) uint8) string {
 	return p
 }
 
-func TestHasForeground(t *testing.T) {
-	disc := func(x, y int) uint8 {
-		d := (x-50)*(x-50) + (y-50)*(y-50)
+// disc is a disc of radius r at (cx, cy) with a soft band of width soft.
+func disc(cx, cy, r, soft int) func(x, y int) uint8 {
+	return func(x, y int) uint8 {
+		d := (x-cx)*(x-cx) + (y-cy)*(y-cy)
 		switch {
-		case d < 30*30:
+		case d < r*r:
 			return 255
-		case d < 31*31:
-			return 128 // a one-pixel soft edge, 6% of the claimed area
+		case d < (r+soft)*(r+soft):
+			return 128
 		}
 		return 0
 	}
+}
+
+// strip is a 1000×20 mask: 100 confident columns, then soft uncertain ones,
+// so its band is exactly soft px, soft/10 % of the long side.
+func strip(soft int) func(x, y int) uint8 {
+	return func(x, y int) uint8 {
+		switch {
+		case x < 100:
+			return 255
+		case x < 100+soft:
+			return 128
+		}
+		return 0
+	}
+}
+
+func TestHasForeground(t *testing.T) {
 	for _, c := range []struct {
 		name string
+		w, h int
 		v    func(x, y int) uint8
 		want string // "" = a subject
 	}{
-		{"hard disc", func(x, y int) uint8 {
-			if (x-50)*(x-50)+(y-50)*(y-50) < 30*30 {
-				return 255
-			}
-			return 0
-		}, ""},
-		{"soft-edged disc", disc, ""},
-		{"empty", func(x, y int) uint8 { return 0 }, "empty"},
-		{"uniform half", func(x, y int) uint8 { return 128 }, "100% of"},
-		{"smooth ramp", func(x, y int) uint8 { return uint8(x * 255 / 99) }, "uncertain"},
-		{"stray confident pixel in haze", func(x, y int) uint8 {
-			if x == 0 && y == 0 {
+		{"hard disc", 100, 100, disc(50, 50, 30, 0), ""},
+		{"soft-edged disc", 100, 100, disc(50, 50, 30, 2), ""},
+		// 3% of the frame with a 3 px soft edge: 14% of its claimed pixels
+		// are uncertain, yet the band is 0.75% of the frame.
+		{"small disc", 400, 400, disc(200, 200, 39, 3), ""},
+		{"band just under the limit", 1000, 20, strip(24), ""},
+		{"band just over the limit", 1000, 20, strip(26), "2.6% of the frame"},
+		{"empty", 100, 100, func(x, y int) uint8 { return 0 }, "empty"},
+		{"uniform half", 100, 100, func(x, y int) uint8 { return 128 }, "clearly subject"},
+		{"smooth ramp", 100, 100, func(x, y int) uint8 { return uint8(x * 255 / 99) }, "band"},
+		{"stray confident pixel in haze", 100, 100, func(x, y int) uint8 {
+			if x == 50 && y == 50 {
 				return 255
 			}
 			return 40
-		}, "uncertain"},
+		}, "band"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			err := hasForeground(maskFile(t, c.v))
+			err := hasForeground(maskFile(t, c.w, c.h, c.v))
 			if c.want == "" {
 				if err != nil {
 					t.Fatalf("subject refused: %v", err)

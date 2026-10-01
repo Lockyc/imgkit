@@ -191,7 +191,8 @@ func (j job) run(ctx context.Context) (int, int, error) {
 		return 0, 0, err
 	}
 	if err := hasForeground(mask); err != nil {
-		return 0, 0, fmt.Errorf("%s: %w", j.in, err)
+		other := map[string]string{"vision": "birefnet", "birefnet": "vision (macOS)"}[j.coarse]
+		return 0, 0, fmt.Errorf("%s: %w; try --coarse %s", j.in, err, other)
 	}
 	args := []string{"--image", frame, "--coarse", mask, "--out", j.out,
 		"--model", pins.ViTMatte.Repo, "--revision", pins.ViTMatte.Revision,
@@ -225,35 +226,47 @@ func (j job) coarseMask(ctx context.Context, frame, mask, tmp string) error {
 	return err
 }
 
-// maxUncertain is the largest share of a coarse mask's claimed pixels
-// (above 5%) that may sit between 5% and 95%. A mask that found a subject
-// is near-binary: only its edge is soft. A mask that found nothing is a
-// haze, because rembg stretches BiRefNet's output to the full 0–1 range,
-// so a flat frame whose raw output never passes 0.0001 comes back as a
-// 98%-"foreground" haze. Measured on both coarse masks: real subjects
-// (portrait over foliage, fur over a matching ground and three tight crops
-// of each filling 59–92% of the frame, the embroidery detail, a synthetic
-// figure) are at most 4.5% uncertain; empty frames (eight flat colours,
-// linear, radial and plasma gradients, noise, checkerboard, stripes,
-// plaster texture) are at least 33% (the radial gradient), most of them
-// 99–100%. 12% sits about 2.7× from each side. Coverage bounds, colour
-// separation, edge agreement and BiRefNet's raw confidence each overlap
-// between the two groups.
-const maxUncertain = 0.12
+// maxBand is the widest a coarse mask's uncertain band may be, as a share of
+// the frame's long side. The band's width is its uncertain pixels (5–95%)
+// over the perimeter of its confident region (95% and up). A mask that found
+// a subject is near-binary with a soft edge a few px wide whatever the
+// subject's size; the uncertain share of the mask is not, and reaches
+// 15% on Vision for a subject filling 3% of the frame. A mask that found
+// nothing is a haze with no confident region, or a ramp whose band runs
+// across much of the frame: rembg stretches BiRefNet's output to the full
+// 0–1 range, so a flat frame whose raw output never passes 0.0001 comes back
+// as a 98%-"foreground" haze.
+//
+// Measured on 28 subjects under each coarse mask (the portrait, the fur, the
+// synthetic figure and the embroidery detail; six tight crops filling 59–92%
+// of the frame; and the first three composited onto plaster and foliage at
+// 3%, 8% and 15% of the frame), the widest band is 0.97% on BiRefNet (the
+// fur crop at 92%) and 0.50% on Vision (the portrait at 8%). Of 23 empty
+// frames (10 flat colours; two linear, a radial and two plasma gradients;
+// four kinds of noise; checkerboard; stripes; the plaster texture and a crop
+// of it), Vision refuses all itself, and on BiRefNet the narrowest band is
+// 7.95% (the radial gradient), then 13.9% (flat red); the other 21 have no
+// confident region or a band of 92% and up. 2.5% holds for that
+// population, 2.6× above the widest subject and 3.2× below the narrowest
+// empty frame.
+const maxBand = 0.025
 
-// hasForeground refuses a coarse mask that found no subject: one with no
-// claimed pixel, or one more than maxUncertain uncertain.
+// hasForeground refuses a coarse mask that found no subject: one that marks
+// nothing, nothing clearly, or nothing with an edge narrower than maxBand.
 func hasForeground(mask string) error {
 	m, err := raster.Load(mask)
 	if err != nil {
 		return err
 	}
 	const lo, hi = 0.05 * 0xffff, 0.95 * 0xffff
-	var claimed, uncertain int
 	b := m.Bounds()
-	for y := b.Min.Y; y < b.Max.Y; y++ {
-		for x := b.Min.X; x < b.Max.X; x++ {
-			v := float64(m.RGBA64At(x, y).R)
+	w, h := b.Dx(), b.Dy()
+	sure := make([]bool, w*h)
+	var claimed, uncertain int
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			v := float64(m.RGBA64At(b.Min.X+x, b.Min.Y+y).R)
+			sure[y*w+x] = v >= hi
 			if v > lo {
 				claimed++
 				if v < hi {
@@ -265,8 +278,28 @@ func hasForeground(mask string) error {
 	if claimed == 0 {
 		return fmt.Errorf("no foreground found: the coarse mask is empty")
 	}
-	if u := float64(uncertain) / float64(claimed); u > maxUncertain {
-		return fmt.Errorf("no foreground found: %.0f%% of the coarse mask is uncertain, and a subject's is at most %.0f%%", 100*u, 100*maxUncertain)
+	perimeter := 0
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			if sure[y*w+x] && ((x > 0 && !sure[y*w+x-1]) || (x < w-1 && !sure[y*w+x+1]) ||
+				(y > 0 && !sure[(y-1)*w+x]) || (y < h-1 && !sure[(y+1)*w+x])) {
+				perimeter++
+			}
+		}
+	}
+	if perimeter == 0 && uncertain > 0 {
+		return fmt.Errorf("no foreground found: no part of the coarse mask is clearly subject")
+	}
+	if perimeter == 0 {
+		return nil // all subject, edge to edge
+	}
+	band := float64(uncertain) / float64(perimeter)
+	if share := band / float64(max(w, h)); share > maxBand {
+		width := "wider than the frame"
+		if share < 1 {
+			width = fmt.Sprintf("%.1f%% of the frame's long side", 100*share)
+		}
+		return fmt.Errorf("no foreground found: %.0f%% of the coarse mask is neither clearly subject nor background, a band around what it marks as subject averaging %s", 100*float64(uncertain)/float64(claimed), width)
 	}
 	return nil
 }

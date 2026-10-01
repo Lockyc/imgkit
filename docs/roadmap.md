@@ -26,3 +26,12 @@ reading the project's assets without writing to its tree.
 ## Sequencing
 
 Phases run in order. Within a phase, order is open.
+
+## Deferred
+
+- **cutout on semi-transparent subjects.** Smoke, glass or a dandelion
+  clock may be refused as "no foreground found": their mask is soft across
+  the whole subject, not just at its edge, and the empty-frame check
+  (`maxBand` in internal/cutout) reads that as a haze. Deferred because no
+  measured subject is like that. Unlock: a `quality/` case with such a
+  subject, then a `--max-band` flag measured on it.

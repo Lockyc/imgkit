@@ -193,6 +193,20 @@ stderr = "no foreground"
 absent = ["{tmp:cut.png}"]
 
 [[case]]
+name   = "cutout-small-subject"
+why    = "a subject filling 3% of the frame has a soft edge as wide as a large one's, so it is a larger share of its mask; it must still be cut out"
+setup  = [["magick", "-size", "2400x1600", "gradient:#6b8f4e-#2f4f2f", "-seed", "2", "-attenuate", "0.6", "+noise", "Gaussian", "-fill", "#d8a882", "-draw", "circle 1500,700 1500,600", "-fill", "#2b3f7a", "-draw", "rectangle 1390,800 1610,1170", "{tmp:small.png}"]]
+run    = ["cutout", "{tmp:small.png}", "{tmp:cut.png}"]
+stdout = "wrote"
+
+[[case]]
+name   = "cutout-small-subject-birefnet"
+why    = "the Linux default coarse mask must accept the same small subject"
+setup  = [["magick", "-size", "2400x1600", "gradient:#6b8f4e-#2f4f2f", "-seed", "2", "-attenuate", "0.6", "+noise", "Gaussian", "-fill", "#d8a882", "-draw", "circle 1500,700 1500,600", "-fill", "#2b3f7a", "-draw", "rectangle 1390,800 1610,1170", "{tmp:small.png}"]]
+run    = ["cutout", "--coarse", "birefnet", "{tmp:small.png}", "{tmp:cut.png}"]
+stdout = "wrote"
+
+[[case]]
 name   = "cutout-subject-fills-frame"
 why    = "a subject filling most of the frame is a subject, not an empty frame"
 setup  = [["magick", "{asset:fur-matching-ground.jpg}", "-crop", "700x600+650+350", "+repage", "{tmp:tight.png}"]]
