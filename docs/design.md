@@ -25,6 +25,7 @@ internal/<op>/       one package per command (cutout, inpaint, infill, upscale,
                      grade, render, press, diff, fonts, qr, doctor)
 internal/cli/        flag, exit-code and error conventions every command shares
 internal/engine/     the one way an external tool is run
+internal/frame/      the source pre-pass: oriented, sRGB, 8-bit RGB(A) PNG
 internal/enginetest/ sh stubs that stand in for engines in tests
 internal/pins/       the one table of engine versions
 internal/pdf/        PDF page count, page boxes and text through poppler
