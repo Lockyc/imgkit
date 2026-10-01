@@ -167,6 +167,39 @@ stderr = "no foreground"
 absent = ["{tmp:cut.png}"]
 
 [[case]]
+name   = "cutout-no-foreground-colour"
+why    = "BiRefNet calls two thirds of a flat red frame confident foreground; it must still fail"
+setup  = [["magick", "-size", "800x600", "xc:#c0392b", "{tmp:flat.png}"]]
+run    = ["cutout", "--coarse", "birefnet", "{tmp:flat.png}", "{tmp:cut.png}"]
+exit   = 1
+stderr = "no foreground"
+absent = ["{tmp:cut.png}"]
+
+[[case]]
+name   = "cutout-no-foreground-radial"
+why    = "a bright radial gradient reads as a glowing disc to BiRefNet; with no object it must fail"
+setup  = [["magick", "-size", "800x600", "radial-gradient:white-#333355", "{tmp:radial.png}"]]
+run    = ["cutout", "--coarse", "birefnet", "{tmp:radial.png}", "{tmp:cut.png}"]
+exit   = 1
+stderr = "no foreground"
+absent = ["{tmp:cut.png}"]
+
+[[case]]
+name   = "cutout-no-foreground-texture"
+why    = "a textured wall with no object must fail, not cut out a patch of plaster"
+run    = ["cutout", "--coarse", "birefnet", "{asset:flat-ground.jpg}", "{tmp:cut.png}"]
+exit   = 1
+stderr = "no foreground"
+absent = ["{tmp:cut.png}"]
+
+[[case]]
+name   = "cutout-subject-fills-frame"
+why    = "a subject filling most of the frame is a subject, not an empty frame"
+setup  = [["magick", "{asset:fur-matching-ground.jpg}", "-crop", "700x600+650+350", "+repage", "{tmp:tight.png}"]]
+run    = ["cutout", "--coarse", "birefnet", "{tmp:tight.png}", "{tmp:cut.png}"]
+stdout = "wrote"
+
+[[case]]
 name   = "infill-texture"
 why    = "a filled hole must not be flatter than the ground around it"
 setup  = [["magick", "-size", "1521x1521", "xc:black", "-fill", "white", "-draw", "circle 760,760 760,610", "{tmp:mask.png}"]]

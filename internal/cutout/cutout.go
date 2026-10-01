@@ -225,18 +225,48 @@ func (j job) coarseMask(ctx context.Context, frame, mask, tmp string) error {
 	return err
 }
 
+// maxUncertain is the largest share of a coarse mask's claimed pixels
+// (above 5%) that may sit between 5% and 95%. A mask that found a subject
+// is near-binary: only its edge is soft. A mask that found nothing is a
+// haze, because rembg stretches BiRefNet's output to the full 0–1 range,
+// so a flat frame whose raw output never passes 0.0001 comes back as a
+// 98%-"foreground" haze. Measured on both coarse masks: real subjects
+// (portrait over foliage, fur over a matching ground and three tight crops
+// of each filling 59–92% of the frame, the embroidery detail, a synthetic
+// figure) are at most 4.5% uncertain; empty frames (eight flat colours,
+// linear, radial and plasma gradients, noise, checkerboard, stripes,
+// plaster texture) are at least 33% (the radial gradient), most of them
+// 99–100%. 12% sits about 2.7× from each side. Coverage bounds, colour
+// separation, edge agreement and BiRefNet's raw confidence each overlap
+// between the two groups.
+const maxUncertain = 0.12
+
+// hasForeground refuses a coarse mask that found no subject: one with no
+// claimed pixel, or one more than maxUncertain uncertain.
 func hasForeground(mask string) error {
 	m, err := raster.Load(mask)
 	if err != nil {
 		return err
 	}
+	const lo, hi = 0.05 * 0xffff, 0.95 * 0xffff
+	var claimed, uncertain int
 	b := m.Bounds()
 	for y := b.Min.Y; y < b.Max.Y; y++ {
 		for x := b.Min.X; x < b.Max.X; x++ {
-			if m.RGBA64At(x, y).R > 0x7fff {
-				return nil
+			v := float64(m.RGBA64At(x, y).R)
+			if v > lo {
+				claimed++
+				if v < hi {
+					uncertain++
+				}
 			}
 		}
 	}
-	return fmt.Errorf("no foreground found")
+	if claimed == 0 {
+		return fmt.Errorf("no foreground found: the coarse mask is empty")
+	}
+	if u := float64(uncertain) / float64(claimed); u > maxUncertain {
+		return fmt.Errorf("no foreground found: %.0f%% of the coarse mask is uncertain, and a subject's is at most %.0f%%", 100*u, 100*maxUncertain)
+	}
+	return nil
 }

@@ -270,3 +270,67 @@ func TestInputEqualToOutputIsRefused(t *testing.T) {
 		t.Errorf("a model ran for a refused cut-out: %q", c)
 	}
 }
+
+// maskFile writes a 100x100 grey mask whose value at (x, y) is v(x, y).
+func maskFile(t *testing.T, v func(x, y int) uint8) string {
+	t.Helper()
+	img := image.NewGray(image.Rect(0, 0, 100, 100))
+	for y := 0; y < 100; y++ {
+		for x := 0; x < 100; x++ {
+			img.SetGray(x, y, color.Gray{v(x, y)})
+		}
+	}
+	p := filepath.Join(t.TempDir(), "mask.png")
+	if err := raster.SavePNG(p, img); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func TestHasForeground(t *testing.T) {
+	disc := func(x, y int) uint8 {
+		d := (x-50)*(x-50) + (y-50)*(y-50)
+		switch {
+		case d < 30*30:
+			return 255
+		case d < 31*31:
+			return 128 // a one-pixel soft edge, 6% of the claimed area
+		}
+		return 0
+	}
+	for _, c := range []struct {
+		name string
+		v    func(x, y int) uint8
+		want string // "" = a subject
+	}{
+		{"hard disc", func(x, y int) uint8 {
+			if (x-50)*(x-50)+(y-50)*(y-50) < 30*30 {
+				return 255
+			}
+			return 0
+		}, ""},
+		{"soft-edged disc", disc, ""},
+		{"empty", func(x, y int) uint8 { return 0 }, "empty"},
+		{"uniform half", func(x, y int) uint8 { return 128 }, "100% of"},
+		{"smooth ramp", func(x, y int) uint8 { return uint8(x * 255 / 99) }, "uncertain"},
+		{"stray confident pixel in haze", func(x, y int) uint8 {
+			if x == 0 && y == 0 {
+				return 255
+			}
+			return 40
+		}, "uncertain"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			err := hasForeground(maskFile(t, c.v))
+			if c.want == "" {
+				if err != nil {
+					t.Fatalf("subject refused: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), "no foreground found") || !strings.Contains(err.Error(), c.want) {
+				t.Fatalf("want a refusal containing %q, got %v", c.want, err)
+			}
+		})
+	}
+}
