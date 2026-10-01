@@ -15,7 +15,8 @@
 """matte.py -- refine a coarse mask into a hair-level alpha matte.
 
     matte.py --image frame.png --coarse mask.png --out out.png --model REPO --revision SHA
-             [--context-height 1024] [--band-in 12] [--band-out 40] [--tile 1024] [--overlap 128]
+             --context-width W --context-height H --band-in D --band-out D
+             --tile PX --overlap PX
              [--despill-hue 70:100 --despill-hue-end 200 --despill-chroma 6:40
               --despill-lmax 88 --despill-clean 15:65]
 
@@ -23,13 +24,17 @@
    deep inside its silhouette, so the band must be wide: the mask eroded by
    height/band-in is sure foreground, and beyond it dilated by
    height/band-out is sure background. ViTMatte solves that band in one
-   whole-frame pass at --context-height, where it sees the whole subject.
+   whole-frame pass with the frame scaled to --context-width x
+   --context-height, where it sees the whole subject.
    On full-resolution tiles the same wide band turns solid parts that
    resemble the background (a grey sleeve over pale bark) see-through.
 2. trimap: the context alpha, thresholded at 0.5, replaces the coarse mask.
    It eroded by height/REFINE_IN_DIV is sure foreground, beyond it dilated by
    height/band-out is sure background, and the context's soft pixels, grown
-   by height/SOFT_DIV, are unknown.
+   by height/SOFT_DIV, are unknown. REFINE_IN_DIV and SOFT_DIV are fixed,
+   not flags: they only frame the context's own edge for the full-resolution
+   pass, and how deep a coarse mask is wrong is the subject-dependent choice,
+   which --band-in makes in the context pass.
 3. alpha: ViTMatte predicts alpha over the unknown band at full resolution,
    on tile-px tiles overlapping by overlap px, blended with a linear ramp,
    and only on tiles with unknown pixels. The network's global attention
@@ -81,11 +86,12 @@ def main() -> None:
     ap.add_argument("--out", required=True)
     ap.add_argument("--model", required=True)
     ap.add_argument("--revision", required=True)
-    ap.add_argument("--context-height", type=int, default=1024)
-    ap.add_argument("--band-in", type=int, default=12)
-    ap.add_argument("--band-out", type=int, default=40)
-    ap.add_argument("--tile", type=int, default=1024)
-    ap.add_argument("--overlap", type=int, default=128)
+    ap.add_argument("--context-width", type=int, required=True)
+    ap.add_argument("--context-height", type=int, required=True)
+    ap.add_argument("--band-in", type=int, required=True)
+    ap.add_argument("--band-out", type=int, required=True)
+    ap.add_argument("--tile", type=int, required=True)
+    ap.add_argument("--overlap", type=int, required=True)
     ap.add_argument("--despill-hue", type=pair)
     ap.add_argument("--despill-hue-end", type=float)
     ap.add_argument("--despill-chroma", type=pair)
@@ -109,10 +115,11 @@ def main() -> None:
     model = VitMatteForImageMatting.from_pretrained(a.model, revision=a.revision).to(device).eval()
     t0 = time.time()
 
-    ch = min(a.context_height, h)
-    small = img.resize((round(img.width * ch / h), ch), Image.LANCZOS) if ch != h else img
+    size = (a.context_width, a.context_height)
+    # Both are area averages, so the context frame and its trimap line up.
+    small = img.resize(size, Image.BOX) if size != img.size else img
     coarse_small = cv2.resize(coarse, small.size, interpolation=cv2.INTER_AREA)
-    context, _ = matte_tiled(small, trimap(binary(coarse_small), ch, a.band_in, a.band_out), processor, model, device, 0, 0)
+    context, _ = matte_tiled(small, trimap(binary(coarse_small), small.height, a.band_in, a.band_out), processor, model, device, 0, 0)
     context = cv2.resize(context, img.size, interpolation=cv2.INTER_LINEAR)
 
     mask = binary((context * 255).round().astype(np.uint8))

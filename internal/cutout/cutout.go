@@ -1,6 +1,7 @@
 // Package cutout lifts the subject out of an image as RGBA at the source's
 // framing: a coarse mask (Apple Vision or BiRefNet) as the prior, ViTMatte
-// re-solving a wide band of it over the whole frame at contextHeight and
+// re-solving a wide band of it over the whole frame at up to contextSide²
+// px and
 // then the edge at full resolution in tiles, foreground estimation to
 // lift the background's tint out of soft edges, and an optional despill.
 // Every step computes alpha or un-mixes captured colour, so cutout is not
@@ -12,6 +13,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -33,11 +35,24 @@ const usage = "cutout [--coarse vision|birefnet] [--height PX] [--tile PX] [--ba
 // larger than it, or the tiles never advance across the frame.
 const overlap = 128
 
-// contextHeight is the height, in px, of the whole-frame ViTMatte pass that
-// re-solves the coarse mask before the full-resolution pass. Whole-frame
-// ViTMatte memory grows with the fourth power of height; at 1024 px it needs
-// about as much as one 1024 px tile.
-const contextHeight = 1024
+// contextSide bounds the whole-frame ViTMatte pass that re-solves the coarse
+// mask before the full-resolution pass: its frame holds at most contextSide²
+// px. ViTMatte's memory grows with the square of the pixel count, whatever
+// the shape, so an area bound costs one 1024 px tile's memory at any aspect
+// ratio and keeps all the resolution that budget allows. A height or long-side
+// bound would not: a height bound lets a panorama grow without limit, and a
+// long-side bound wastes resolution on every frame that is not square.
+const contextSide = 1024
+
+// contextSize scales a w×h frame to at most contextSide² px, keeping its
+// aspect ratio. It never enlarges.
+func contextSize(w, h int) (int, int) {
+	if w*h <= contextSide*contextSide {
+		return w, h
+	}
+	s := contextSide / math.Sqrt(float64(w)*float64(h))
+	return max(1, int(float64(w)*s)), max(1, int(float64(h)*s))
+}
 
 // despill is one full set of despill values: matte.py despills only with
 // all five, and has no defaults of its own.
@@ -83,7 +98,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	coarse := fs.String("coarse", defaultCoarse(), "coarse mask: vision (macOS) or birefnet")
 	height := fs.Int("height", 0, "working height in px, never above the source; at least the largest size the cut-out will be drawn at (0 = source height)")
 	tile := fs.Int("tile", 1024, fmt.Sprintf("ViTMatte tile size in px, above the %d px overlap; 0 runs the whole frame (memory grows with the fourth power of height)", overlap))
-	bin := fs.Int("band-in", 12, "sure foreground of the context pass: the coarse mask eroded by height/D; lower it when the coarse mask swallows background deeper behind hair or fur")
+	bin := fs.Int("band-in", 12, "sure foreground of the context pass: the coarse mask eroded by height/D; lower it when the coarse mask swallows background deeper behind hair or fur, raise it when a part of the subject is thinner than about 2·height/D")
 	bout := fs.Int("band-out", 40, "sure background: beyond the coarse mask dilated by height/D")
 	preset := fs.String("despill", "", "despill preset: warm-on-green; the --despill-* flags override its values")
 	hue := fs.String("despill-hue", "", "contamination ramp in Lab hue degrees, A:B; without a preset, despill needs all five --despill-* flags")
@@ -178,6 +193,7 @@ func (j job) run(ctx context.Context) (int, int, error) {
 	if h > sh {
 		return 0, 0, fmt.Errorf("--height %d would upsample the %d px source; a cut-out is never upsampled", h, sh)
 	}
+	cw, ch := contextSize(int(math.Round(float64(sw)*float64(h)/float64(sh))), h)
 	srgb, err := icc.SRGB()
 	if err != nil {
 		return 0, 0, err
@@ -203,7 +219,7 @@ func (j job) run(ctx context.Context) (int, int, error) {
 	}
 	args := []string{"--image", frame, "--coarse", mask, "--out", j.out,
 		"--model", pins.ViTMatte.Repo, "--revision", pins.ViTMatte.Revision,
-		"--context-height", strconv.Itoa(contextHeight), "--band-in", strconv.Itoa(j.bin), "--band-out", strconv.Itoa(j.bout),
+		"--context-width", strconv.Itoa(cw), "--context-height", strconv.Itoa(ch), "--band-in", strconv.Itoa(j.bin), "--band-out", strconv.Itoa(j.bout),
 		"--tile", strconv.Itoa(j.tile), "--overlap", strconv.Itoa(overlap)}
 	if d := j.despill; d.hue != "" {
 		args = append(args, "--despill-hue", d.hue, "--despill-clean", d.clean, "--despill-chroma", d.chroma,

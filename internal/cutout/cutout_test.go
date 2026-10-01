@@ -79,7 +79,7 @@ func TestCutoutBirefnet(t *testing.T) {
 		t.Fatalf("code %d: %s", code, e.stderr.String())
 	}
 	matte := matteCall(t, e)
-	wantFlags(t, matte, map[string]string{"--model": pins.ViTMatte.Repo, "--revision": pins.ViTMatte.Revision, "--tile": "1024", "--overlap": strconv.Itoa(overlap), "--context-height": strconv.Itoa(contextHeight), "--band-in": "12", "--band-out": "40"})
+	wantFlags(t, matte, map[string]string{"--model": pins.ViTMatte.Repo, "--revision": pins.ViTMatte.Revision, "--tile": "1024", "--overlap": strconv.Itoa(overlap), "--context-width": "400", "--context-height": "600", "--band-in": "12", "--band-out": "40"})
 	for _, a := range matte {
 		if strings.HasPrefix(a, "--despill") {
 			t.Errorf("despill ran without being asked for: %q", matte)
@@ -105,6 +105,34 @@ func wantFlags(t *testing.T, args []string, want map[string]string) {
 			t.Errorf("%s: want %s in %q", k, v, args)
 		}
 	}
+}
+
+func TestContextSize(t *testing.T) {
+	for _, c := range []struct{ w, h, cw, ch int }{
+		{400, 600, 400, 600},     // under the bound: never upsampled
+		{1024, 1024, 1024, 1024}, // exactly the bound
+		{2400, 2206, 1068, 981},  // portrait-ivy.jpg
+		{3000, 1000, 1773, 591},  // 3:1 panorama
+		{4000, 200, 4000, 200},   // short wide strip under the bound
+		{20000, 200, 10240, 102}, // long strip over it
+	} {
+		cw, ch := contextSize(c.w, c.h)
+		if cw != c.cw || ch != c.ch {
+			t.Errorf("contextSize(%d, %d) = %dx%d, want %dx%d", c.w, c.h, cw, ch, c.cw, c.ch)
+		}
+		if cw*ch > contextSide*contextSide {
+			t.Errorf("contextSize(%d, %d) = %dx%d, over %d² px", c.w, c.h, cw, ch, contextSide)
+		}
+	}
+}
+
+func TestCutoutWideFrameContext(t *testing.T) {
+	e := setup(t)
+	t.Setenv("SRC_DIMS", "3000x1000")
+	if code := e.run("--coarse", "birefnet"); code != 0 {
+		t.Fatalf("code %d: %s", code, e.stderr.String())
+	}
+	wantFlags(t, matteCall(t, e), map[string]string{"--context-width": "1773", "--context-height": "591"})
 }
 
 func TestWholeFrameTile(t *testing.T) {
