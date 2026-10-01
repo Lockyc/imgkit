@@ -140,8 +140,19 @@ func run(ctx context.Context, in, mask, out string, radii []int, grain float64, 
 	for _, l := range layers[1:] {
 		args = append(args, l, "-compose", "over", "-composite")
 	}
-	if err := magick(layers, append(args, "-alpha", "off", fill)...); err != nil {
+	// Each level is opaque only as far as its blur reaches, so a hole wider
+	// than the coarsest reach keeps a middle no level covers, which -alpha
+	// off would show as black.
+	reach := filepath.Join(tmp, "reach.png")
+	if err := magick(layers, append(args, "-write", reach, "-alpha", "off", fill)...); err != nil {
 		return err
+	}
+	res, err := engine.Run(ctx, engine.Cmd{Engine: "magick", Args: []string{reach, "-alpha", "extract", "(", m, "-negate", ")", "-compose", "lighten", "-composite", "-format", "%[fx:minima]", "info:"}, Inputs: []string{reach, m}})
+	if err != nil {
+		return err
+	}
+	if v, err := strconv.ParseFloat(strings.TrimSpace(string(res.Stdout)), 64); err != nil || v < 0.5 {
+		return fmt.Errorf("the fill does not reach the middle of a hole: start --levels with a radius coarser than %d", radii[0])
 	}
 	var pieces []piece
 	if grain > 0 {

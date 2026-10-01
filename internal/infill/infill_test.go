@@ -66,6 +66,24 @@ func TestInfillRefusesTransparentSource(t *testing.T) {
 	}
 }
 
+func TestInfillRefusesAnUnreachedHole(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	t.Setenv("FIXTURE", holedPNG(t, dir, 80, 60, false))
+	t.Setenv("REACH", "0")
+	enginetest.Stub(t, "magick", `[ "$1" = identify ] && { echo True; exit 0; }
+case "$*" in *fx:minima*) echo "$REACH"; exit 0 ;; esac
+for a in "$@"; do last=$a; done; cp "$FIXTURE" "$last"`)
+	out := filepath.Join(dir, "out.png")
+	var o, e bytes.Buffer
+	if code := Main(context.Background(), []string{"--mask", pngOf(t, dir, "m.png", 80, 60), "--levels", "30,6", pngOf(t, dir, "in.png", 80, 60), out}, &o, &e); code != 1 || !strings.Contains(e.String(), "coarser than 30") {
+		t.Fatalf("code %d, %q", code, e.String())
+	}
+	if _, err := os.Stat(out); !os.IsNotExist(err) {
+		t.Error("an unfilled result was written")
+	}
+}
+
 func TestInfill(t *testing.T) {
 	for _, c := range []struct {
 		grain string
@@ -76,6 +94,7 @@ func TestInfill(t *testing.T) {
 			t.Chdir(dir)
 			t.Setenv("FIXTURE", holedPNG(t, dir, 80, 60, c.band))
 			log := enginetest.Stub(t, "magick", `[ "$1" = identify ] && { echo "${OPAQUE:-True}"; exit 0; }
+case "$*" in *fx:minima*) echo "${REACH:-1}"; exit 0 ;; esac
 for a in "$@"; do last=$a; done; cp "$FIXTURE" "$last"`)
 			in, mask, out := pngOf(t, dir, "in.png", 80, 60), pngOf(t, dir, "m.png", 80, 60), filepath.Join(dir, "out.png")
 			var o, e bytes.Buffer
@@ -91,15 +110,15 @@ for a in "$@"; do last=$a; done; cp "$FIXTURE" "$last"`)
 			}
 			calls = calls[2:]
 			blurSrc := "holes.png"
-			if c.band { // holes, edge stops, 2 blurs, fill, composite
-				if len(calls) != 6 || filepath.Base(calls[1][len(calls[1])-1]) != "reached.png" {
+			if c.band { // holes, edge stops, 2 blurs, fill, reach check, composite
+				if len(calls) != 7 || filepath.Base(calls[1][len(calls[1])-1]) != "reached.png" {
 					t.Fatalf("want an edge-stop call writing reached.png: %q", calls)
 				}
 				calls = append(calls[:1], calls[2:]...)
 				blurSrc = "reached.png"
 			}
-			if len(calls) != 5 { // holes, 2 blurs, fill, composite
-				t.Fatalf("%d magick calls, want 5: %q", len(calls), calls)
+			if len(calls) != 6 { // holes, 2 blurs, fill, reach check, composite
+				t.Fatalf("%d magick calls, want 6: %q", len(calls), calls)
 			}
 			if !slices.Contains(calls[1], "0x30") || !slices.Contains(calls[2], "0x6") {
 				t.Errorf("blur levels: %q %q", calls[1], calls[2])
@@ -110,7 +129,10 @@ for a in "$@"; do last=$a; done; cp "$FIXTURE" "$last"`)
 			if slices.Contains(calls[3], "+noise") {
 				t.Errorf("fill adds magick noise: %q", calls[3])
 			}
-			comp := calls[4]
+			if !slices.Contains(calls[4], "%[fx:minima]") {
+				t.Errorf("no reach check after the fill: %q", calls[4])
+			}
+			comp := calls[5]
 			if filepath.Base(comp[0]) != "holes.png" || filepath.Base(comp[2]) != "fill.png" || comp[len(comp)-1] != out {
 				t.Errorf("composite takes %q, want holes.png, the fill, then %s", comp, out)
 			}
