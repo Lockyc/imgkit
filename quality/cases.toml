@@ -140,6 +140,14 @@ params = { image = "{tmp:cut.png}", solid = "0.183,0.547 0.243,0.457 0.283,0.415
 max    = 0.001
 
 [[case]]
+name   = "cutout-chin-not-seethrough"
+why    = "dark hair across a chin reads as a gap to a wide band; a context band of 11 instead of 12 punched a 24% see-through hole there"
+run    = ["cutout", "{asset:portrait-foliage.jpg}", "{tmp:cut.png}"]
+metric = "seethrough"
+params = { image = "{tmp:cut.png}", solid = "0.565,0.47 0.645,0.47 0.645,0.525 0.565,0.525" }
+max    = 0.0019
+
+[[case]]
 name   = "cutout-dress-not-seethrough"
 why    = "a silver-green dress and bare arm in front of ivy must stay opaque when the band reaches deep into the coarse mask"
 run    = ["cutout", "{asset:portrait-ivy.jpg}", "{tmp:cut.png}"]
@@ -163,7 +171,7 @@ run    = ["cutout", "--tile", "1024", "{tmp:small.jpg}", "{tmp:tiled.png}"]
 post   = [["imgkit", "cutout", "--tile", "0", "{tmp:small.jpg}", "{tmp:whole.png}"]]
 metric = "rmse"
 params = { a = "{tmp:tiled.png}", b = "{tmp:whole.png}", channels = "alpha" }
-max    = 0.0078
+max    = 0.0067
 
 [[case]]
 name   = "cutout-refuses-upsample"
@@ -211,16 +219,29 @@ absent = ["{tmp:cut.png}"]
 [[case]]
 name   = "cutout-small-subject"
 why    = "a subject filling 3% of the frame has a soft edge as wide as a large one's, so it is a larger share of its mask; it must still be cut out"
-setup  = [["magick", "-size", "2400x1600", "gradient:#6b8f4e-#2f4f2f", "-seed", "2", "-attenuate", "0.6", "+noise", "Gaussian", "-fill", "#d8a882", "-draw", "circle 1500,700 1500,600", "-fill", "#2b3f7a", "-draw", "rectangle 1390,800 1610,1170", "{tmp:small.png}"]]
+setup  = [["magick", "-size", "2400x1600", "gradient:#6b8f4e-#2f4f2f", "-seed", "2", "-attenuate", "0.6", "+noise", "Gaussian", "-fill", "#d8a882", "-draw", "circle 1500,700 1500,600", "-fill", "#2b3f7a", "-draw", "rectangle 1390,800 1610,1170", "{tmp:small.png}"], ["magick", "-size", "2400x1600", "xc:none", "-fill", "white", "-draw", "circle 1500,700 1500,600", "-draw", "rectangle 1390,800 1610,1170", "{tmp:truth.png}"]]
 run    = ["cutout", "{tmp:small.png}", "{tmp:cut.png}"]
-stdout = "wrote"
+metric = "rmse"
+params = { a = "{tmp:cut.png}", b = "{tmp:truth.png}", channels = "alpha" }
+max    = 0.0042
 
 [[case]]
 name   = "cutout-small-subject-birefnet"
 why    = "the Linux default coarse mask must accept the same small subject"
-setup  = [["magick", "-size", "2400x1600", "gradient:#6b8f4e-#2f4f2f", "-seed", "2", "-attenuate", "0.6", "+noise", "Gaussian", "-fill", "#d8a882", "-draw", "circle 1500,700 1500,600", "-fill", "#2b3f7a", "-draw", "rectangle 1390,800 1610,1170", "{tmp:small.png}"]]
+setup  = [["magick", "-size", "2400x1600", "gradient:#6b8f4e-#2f4f2f", "-seed", "2", "-attenuate", "0.6", "+noise", "Gaussian", "-fill", "#d8a882", "-draw", "circle 1500,700 1500,600", "-fill", "#2b3f7a", "-draw", "rectangle 1390,800 1610,1170", "{tmp:small.png}"], ["magick", "-size", "2400x1600", "xc:none", "-fill", "white", "-draw", "circle 1500,700 1500,600", "-draw", "rectangle 1390,800 1610,1170", "{tmp:truth.png}"]]
 run    = ["cutout", "--coarse", "birefnet", "{tmp:small.png}", "{tmp:cut.png}"]
-stdout = "wrote"
+metric = "rmse"
+params = { a = "{tmp:cut.png}", b = "{tmp:truth.png}", channels = "alpha" }
+max    = 0.0042
+
+[[case]]
+name   = "cutout-wide-subject"
+why    = "a 3:1 frame scales its whole-frame context pass by area, not height; the subject must still be cut out to its drawn shape"
+setup  = [["magick", "-size", "3600x1200", "gradient:#6b8f4e-#2f4f2f", "-seed", "3", "-attenuate", "0.6", "+noise", "Gaussian", "-fill", "#d8a882", "-draw", "circle 2400,330 2400,230", "-fill", "#2b3f7a", "-draw", "rectangle 2290,430 2510,800", "{tmp:wide.png}"], ["magick", "-size", "3600x1200", "xc:none", "-fill", "white", "-draw", "circle 2400,330 2400,230", "-draw", "rectangle 2290,430 2510,800", "{tmp:truth.png}"]]
+run    = ["cutout", "{tmp:wide.png}", "{tmp:cut.png}"]
+metric = "rmse"
+params = { a = "{tmp:cut.png}", b = "{tmp:truth.png}", channels = "alpha" }
+max    = 0.0019
 
 [[case]]
 name   = "cutout-subject-fills-frame"
