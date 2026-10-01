@@ -50,14 +50,27 @@ func TestScriptCacheKeyedByContent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	os.WriteFile(p1, []byte("tampered"), 0o644)
-	os.RemoveAll(filepath.Dir(p1))
-	p2, _ := Script(name)
+	if err := os.WriteFile(p1, []byte("tampered"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Dir(p1)); err != nil {
+		t.Fatal(err)
+	}
+	p2, err := Script(name)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if p1 != p2 {
 		t.Errorf("same content, different cache path: %s vs %s", p1, p2)
 	}
-	b, _ := os.ReadFile(p2)
-	want, _ := scripts.ReadFile("scripts/" + name)
+	b, err := os.ReadFile(p2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := scripts.ReadFile("scripts/" + name)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if string(b) != string(want) {
 		t.Error("materialised script differs from the embedded one")
 	}
@@ -87,5 +100,31 @@ func TestRunScriptAndTool(t *testing.T) {
 	want := []string{"tool", "run", "--from", "iopaint==1.6.0", "--exclude-newer", "2026-10-01T00:00:00Z", "iopaint", "run"}
 	if !slices.Equal(calls[len(calls)-1], want) {
 		t.Errorf("RunTool args %q", calls[len(calls)-1])
+	}
+}
+
+func TestInputEqualToOutputIsRefused(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	log := enginetest.Stub(t, "uv", `exit 0`)
+	names, err := fs.Glob(scripts, "scripts/*.py")
+	if err != nil || len(names) == 0 {
+		t.Fatalf("no scripts: %v", err)
+	}
+	f := filepath.Join(t.TempDir(), "same.png")
+	if err := os.WriteFile(f, []byte("png"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := RunScript(context.Background(), filepath.Base(names[0]), nil, []string{f}, []string{f}); err == nil {
+		t.Error("RunScript accepted an input that is also an output")
+	}
+	tool := pins.PyTool{Package: "iopaint", Version: "1.6.0", ExcludeNewer: "2026-10-01T00:00:00Z"}
+	if _, err := RunTool(context.Background(), tool, "iopaint", nil, []string{f}, []string{f}); err == nil {
+		t.Error("RunTool accepted an input that is also an output")
+	}
+	if b, err := os.ReadFile(f); err != nil || string(b) != "png" {
+		t.Errorf("source did not survive: %q %v", b, err)
+	}
+	if c := enginetest.Calls(t, log); len(c) != 0 {
+		t.Errorf("uv ran despite the refusal: %q", c)
 	}
 }

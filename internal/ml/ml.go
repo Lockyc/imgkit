@@ -23,7 +23,7 @@ import (
 //go:embed scripts
 var scripts embed.FS
 
-// Timeout covers a first run, which downloads torch and the model weights.
+// Timeout covers a first run, which downloads the dependencies and model weights.
 const Timeout = 2 * time.Hour
 
 // Script writes an embedded script and its lockfile into the cache and

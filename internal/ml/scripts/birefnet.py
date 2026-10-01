@@ -15,6 +15,7 @@ and u2net dropped an arm. The model finds its edge at 1024 px, so this mask
 is only the prior; matte.py solves the edge at full size.
 """
 
+import os
 import sys
 
 from PIL import Image
@@ -27,6 +28,11 @@ def main() -> None:
     img = Image.open(sys.argv[1]).convert("RGB")
     mask = remove(img, session=new_session("birefnet-general"), only_mask=True)
     mask.convert("L").save(sys.argv[2])
+    # onnxruntime sometimes aborts in its C++ teardown after the work is done,
+    # turning a good run into a non-zero exit. Leave without running it.
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(0)
 
 
 if __name__ == "__main__":
