@@ -64,7 +64,10 @@ func TestCompareScoresChange(t *testing.T) {
 			b.SetRGBA64(x, y, color.RGBA64{shift(c.R), shift(c.G), shift(c.B), 65535})
 		}
 	}
-	res, _, _, _ := Compare(a, b, 28, 0, 2)
+	res, _, _, err := Compare(a, b, 28, 0, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if res.Percent != 10 {
 		t.Fatalf("Percent = %v, want 10", res.Percent)
 	}
@@ -89,7 +92,7 @@ func TestCompareTinyAndMismatched(t *testing.T) {
 	}
 }
 
-func TestMain(t *testing.T) {
+func TestDiffMain(t *testing.T) {
 	dir := t.TempDir()
 	a := noise(60, 60, 5)
 	pa, pb, pd := filepath.Join(dir, "a.png"), filepath.Join(dir, "b.png"), filepath.Join(dir, "d.png")
@@ -113,15 +116,91 @@ func TestMain(t *testing.T) {
 	if code := Main(context.Background(), []string{pa, filepath.Join(dir, "missing.png")}, &out, &errb); code != 2 {
 		t.Fatalf("missing file: code %d, want 2", code)
 	}
-	// Test that --out must not be the same file as an input; a.png should be unchanged
-	beforeMod, _ := os.Stat(pa)
+}
+
+func TestDiffMainOutputSameAsInput(t *testing.T) {
+	dir := t.TempDir()
+	a := noise(60, 60, 5)
+	b := noise(60, 60, 6)
+	pa, pb := filepath.Join(dir, "a.png"), filepath.Join(dir, "b.png")
+	raster.SavePNG(pa, a)
+	raster.SavePNG(pb, b)
+
+	// Store original a.png content
+	beforeContent, err := os.ReadFile(pa)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test --out==<a>: a.png should be unchanged
+	var out, errb bytes.Buffer
+	if code := Main(context.Background(), []string{"--out", pa, pa, pb}, &out, &errb); code != 2 {
+		t.Fatalf("--out same as <a>: code %d, want 2", code)
+	}
+	afterContent, err := os.ReadFile(pa)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(beforeContent) != string(afterContent) {
+		t.Error("a.png was modified")
+	}
+
+	// Test --out==<b>: b.png should be unchanged
+	beforeContent, err = os.ReadFile(pb)
+	if err != nil {
+		t.Fatal(err)
+	}
 	out.Reset()
 	errb.Reset()
-	if code := Main(context.Background(), []string{"--out", pa, pa, pb}, &out, &errb); code != 2 {
-		t.Fatalf("--out same as input: code %d, want 2", code)
+	if code := Main(context.Background(), []string{"--out", pb, pa, pb}, &out, &errb); code != 2 {
+		t.Fatalf("--out same as <b>: code %d, want 2", code)
 	}
-	afterMod, _ := os.Stat(pa)
-	if beforeMod.ModTime() != afterMod.ModTime() {
-		t.Error("a.png was modified")
+	afterContent, err = os.ReadFile(pb)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(beforeContent) != string(afterContent) {
+		t.Error("b.png was modified")
+	}
+}
+
+func TestDiffMainValidation(t *testing.T) {
+	dir := t.TempDir()
+	a := noise(60, 60, 5)
+	b := noise(60, 60, 6)
+	pa, pb := filepath.Join(dir, "a.png"), filepath.Join(dir, "b.png")
+	raster.SavePNG(pa, a)
+	raster.SavePNG(pb, b)
+
+	var out, errb bytes.Buffer
+
+	// Test negative --max-shift
+	if code := Main(context.Background(), []string{"--max-shift", "-1", pa, pb}, &out, &errb); code != 2 {
+		t.Fatalf("negative --max-shift: code %d, want 2", code)
+	}
+
+	// Test --step < 1
+	out.Reset()
+	errb.Reset()
+	if code := Main(context.Background(), []string{"--step", "0", pa, pb}, &out, &errb); code != 2 {
+		t.Fatalf("--step < 1: code %d, want 2", code)
+	}
+
+	// Test negative --threshold when explicitly set
+	out.Reset()
+	errb.Reset()
+	if code := Main(context.Background(), []string{"--threshold", "-1", pa, pb}, &out, &errb); code != 2 {
+		t.Fatalf("negative --threshold: code %d, want 2", code)
+	}
+}
+
+func TestCompareError(t *testing.T) {
+	// Test that Compare properly validates inputs
+	a := noise(100, 100, 7)
+
+	// Empty b image should error
+	b := image.NewRGBA64(image.Rect(0, 0, 0, 0))
+	if _, _, _, err := Compare(a, b, 28, 60, 2); err == nil {
+		t.Error("empty image should return error")
 	}
 }

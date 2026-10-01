@@ -10,6 +10,7 @@ package diff
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"image"
 	"image/color"
@@ -93,6 +94,9 @@ func Compare(a, b *image.RGBA64, tol uint8, maxShift, step int) (Result, *image.
 			best, bestTop, bestBottom = Result{Percent: pct, Shift: shift}, top, bottom
 		}
 	}
+	if best.Percent < 0 {
+		return Result{}, nil, image.Rectangle{}, fmt.Errorf("no shifts to evaluate: consider increasing --max-shift")
+	}
 	rows := image.Rect(0, bestTop, w, bestBottom)
 	mask := image.NewGray(rows)
 	for y := bestTop; y < bestBottom; y++ {
@@ -129,7 +133,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	tol := fs.Uint("tolerance", 28, "per-pixel luma difference, 0-255, below which pixels count as equal")
 	maxShift := fs.Int("max-shift", 60, "px of vertical misalignment to search")
 	step := fs.Int("step", 2, "search granularity in px")
-	threshold := fs.Float64("threshold", -1, "exit 1 when more than this percent of pixels differ")
+	threshold := fs.Float64("threshold", 0, "exit 1 when more than this percent of pixels differ")
 	outPath := fs.String("out", "", "write a picture of the changed pixels here (PNG)")
 	rest, code, ok := cli.Parse(fs, args, 2)
 	if !ok {
@@ -138,6 +142,21 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fail := func(err error) int { fmt.Fprintf(stderr, "imgkit diff: %v\n", err); return 2 }
 	if *tol > 255 {
 		return fail(fmt.Errorf("--tolerance must be 0-255"))
+	}
+	if *maxShift < 0 {
+		return fail(fmt.Errorf("--max-shift must be >= 0"))
+	}
+	if *step < 1 {
+		return fail(fmt.Errorf("--step must be >= 1"))
+	}
+	thresholdSet := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "threshold" {
+			thresholdSet = true
+		}
+	})
+	if thresholdSet && *threshold < 0 {
+		return fail(fmt.Errorf("--threshold must be >= 0"))
 	}
 	if *outPath != "" && (engine.SameFile(*outPath, rest[0]) || engine.SameFile(*outPath, rest[1])) {
 		return fail(fmt.Errorf("--out must not be the same file as an input"))
@@ -159,7 +178,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			return fail(err)
 		}
 	}
-	if *threshold < 0 {
+	if !thresholdSet {
 		fmt.Fprintf(stdout, "%.1f%% differ (best fit at %+dpx vertical)\n", res.Percent, res.Shift)
 		return 0
 	}
