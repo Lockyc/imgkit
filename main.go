@@ -22,6 +22,7 @@ import (
 	"github.com/lockyc/imgkit/internal/press"
 	"github.com/lockyc/imgkit/internal/qr"
 	"github.com/lockyc/imgkit/internal/render"
+	"github.com/lockyc/imgkit/internal/upscale"
 )
 
 type command struct {
@@ -43,6 +44,7 @@ var commands = []command{
 	{"cutout", "lift the subject out of an image as RGBA, down to hair and fur", cutout.Main},
 	{"inpaint", "fill a masked region with LaMa (synthesises pixels)", inpaint.Main},
 	{"infill", "fill a hole in a flat ground from its surroundings (synthesises pixels)", infill.Main},
+	{"upscale", "enlarge 4x with Real-ESRGAN (synthesises pixels)", upscale.Main},
 }
 
 func main() {
