@@ -2,3 +2,10 @@
 # registry_test.go fails when a file is missing from this list, a listed
 # file is missing, or a sha256 differs. `source` is a URL, or "synthetic"
 # for files made for imgkit (then `recipe` says how).
+
+[[asset]]
+file    = "Coated_Fogra39L_VIGC_300.icc"
+source  = "https://www.color.org/registry/profiles/Coated_Fogra39L_VIGC_300.icc"
+author  = "VIGC (Flemish Innovation Centre for Graphic Communication), ICC profile registry"
+licence = "May be used, embedded, exchanged, and shared without restriction (ICC profile registry terms)"
+sha256  = "6df43849a84d2632e7900a125f657bd09364ed56775bc4740c1e39a5492d47e3"

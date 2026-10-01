@@ -1,3 +1,116 @@
 # Quality cases: `just quality` runs each one and checks its metric against
 # its threshold. The fields are documented on quality.Case. Thresholds only
 # ever get stricter.
+
+[[case]]
+name   = "render-png-dpi"
+why    = "Chrome writes no pHYs, so a PNG claims 72 dpi and a printer reads the wrong print size"
+files  = { "page.html" = '''<!doctype html><style>html,body{margin:0;background:#1d3557;color:#fff;font:48px sans-serif}</style><p>Render</p>''' }
+run    = ["render", "--size", "800x600", "--scale", "1.5", "--png", "{tmp:p.png}", "{tmp:page.html}"]
+metric = "dpi"
+params = { image = "{tmp:p.png}" }
+min    = 143.99
+max    = 144.01
+
+[[case]]
+name   = "render-large-whole"
+why    = "a large screenshot must come back whole; Chrome has cut one short with a valid header and exit 0"
+files  = { "page.html" = '''<!doctype html><style>html,body{margin:0;width:100%;height:100%;overflow:hidden}img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}#c{position:absolute;right:0;bottom:0;width:40px;height:40px;background:#0c0}</style><img src="photo.jpg"><div id="c"></div>''' }
+setup  = [["magick", "-size", "3000x2000", "xc:gray", "-seed", "7", "+noise", "Random", "-blur", "0x1", "-quality", "90", "{tmp:photo.jpg}"]]
+run    = ["render", "--size", "6000x5000", "--scale", "2", "--png", "{tmp:p.png}", "{tmp:page.html}"]
+metric = "pixel"
+params = { image = "{tmp:p.png}", at = "0.999,0.999", color = "#00cc00" }
+max    = 0.02
+
+[[case]]
+name   = "render-refuses-unverified-size"
+why    = "a render beyond the verified size is refused rather than trusted"
+files  = { "page.html" = "<p>x</p>" }
+run    = ["render", "--size", "8200x8200", "--scale", "2", "--png", "{tmp:p.png}", "{tmp:page.html}"]
+exit   = 1
+stderr = "verified whole"
+absent = ["{tmp:p.png}"]
+
+[[case]]
+name   = "render-fail-if"
+why    = "a page that rendered its own error text must not become an output"
+files  = { "page.html" = '''<p data-source-error style="color:red">could not be read</p>''' }
+run    = ["render", "--size", "400x300", "--fail-if", "could not be read", "--png", "{tmp:p.png}", "{tmp:page.html}"]
+exit   = 1
+stderr = "could not be read"
+absent = ["{tmp:p.png}"]
+
+[[case]]
+name   = "render-pdf-without-page-rule"
+why    = "without a matching @page Chrome prints Letter and drops the rest of the artboard"
+files  = { "page.html" = "<p>no page rule</p>" }
+run    = ["render", "--size", "1200x896", "--pdf", "{tmp:p.pdf}", "{tmp:page.html}"]
+exit   = 1
+stderr = "@page"
+absent = ["{tmp:p.pdf}"]
+
+[[case]]
+name   = "press-clean-master"
+why    = "a Chrome PDF with text, a photo and brand colours presses to outlined CMYK that passes its own soft proof"
+files  = { "page.html" = '''<!doctype html><style>@page{size:1200px 896px;margin:0}html,body{margin:0;width:1200px;height:896px}body{background:#fdfcf1;font:bold 96px sans-serif;color:#062d5f}img{width:600px;height:400px;display:block}.bar{position:absolute;bottom:0;width:100%;height:100px;background:#f7a81b;color:#062d5f;font-size:40px}</style><p>Auction night</p><img src="photo.jpg"><div class="bar">Authorised by the organiser, 1 Example St</div>''' }
+setup  = [
+  ["magick", "-size", "1200x800", "gradient:#c9a27e-#35606b", "-seed", "7", "-attenuate", "0.3", "+noise", "Gaussian", "-quality", "92", "{tmp:photo.jpg}"],
+  ["imgkit", "render", "--size", "1200x896", "--pdf", "{tmp:src.pdf}", "{tmp:page.html}"],
+]
+run    = ["press", "--icc", "{asset:Coated_Fogra39L_VIGC_300.icc}", "--region", "0,0.88,1,0.12:0.06", "{tmp:src.pdf}", "{tmp:press.pdf}"]
+stdout = "CMYK only"
+
+[[case]]
+name   = "diff-ignores-shift"
+why    = "a 4 px vertical shift must not read as a broken page"
+setup  = [
+  ["magick", "-size", "800x1200", "xc:gray", "-seed", "3", "+noise", "Random", "{tmp:a.png}"],
+  ["magick", "{tmp:a.png}", "-background", "white", "-splice", "0x4", "-gravity", "south", "-chop", "0x4", "{tmp:b.png}"],
+]
+run    = ["diff", "--threshold", "1", "{tmp:a.png}", "{tmp:b.png}"]
+stdout = "best fit at +4px"
+
+[[case]]
+name   = "diff-catches-change"
+why    = "a real block change must fail the threshold"
+setup  = [
+  ["magick", "-size", "800x1200", "xc:gray", "-seed", "3", "+noise", "Random", "{tmp:a.png}"],
+  ["magick", "{tmp:a.png}", "-fill", "red", "-draw", "rectangle 100,100 400,500", "{tmp:b.png}"],
+]
+run    = ["diff", "--threshold", "5", "{tmp:a.png}", "{tmp:b.png}"]
+exit   = 1
+stdout = "OVER"
+
+[[case]]
+name   = "qr-decodes"
+why    = "the code must decode to exactly the text given"
+files  = { "page.html" = '''<!doctype html><style>html,body{margin:0;background:#fff}img{display:block;width:137px;margin:40px}</style><img src="qr.svg">''' }
+run    = ["qr", "--fg", "062D5F", "-o", "{tmp:qr.svg}", "https://example.org/auction"]
+post   = [["imgkit", "render", "--size", "400x400", "--scale", "1.5", "--png", "{tmp:qr.png}", "{tmp:page.html}"]]
+metric = "qr-decodes"
+params = { image = "{tmp:qr.png}", text = "https://example.org/auction" }
+min    = 1
+
+[[case]]
+name   = "grade-apply-identity-colour"
+why    = "an identity CLUT must leave colour unchanged"
+setup  = [
+  ["magick", "-size", "600x400", "xc:gray", "-seed", "5", "+noise", "Random", "(", "-size", "600x400", "xc:black", "-fill", "white", "-draw", "circle 300,200 300,20", "-blur", "0x6", ")", "-alpha", "off", "-compose", "CopyOpacity", "-composite", "{tmp:in.png}"],
+  ["magick", "hald:8", "{tmp:id.png}"],
+]
+run    = ["grade", "apply", "--clut", "{tmp:id.png}", "{tmp:in.png}", "{tmp:out.png}"]
+metric = "rmse"
+params = { a = "{tmp:in.png}", b = "{tmp:out.png}" }
+max    = 0.002
+
+[[case]]
+name   = "grade-apply-keeps-alpha"
+why    = "-hald-clut on RGBA returns an opaque rectangle; apply must keep the source's alpha"
+setup  = [
+  ["magick", "-size", "600x400", "xc:gray", "-seed", "5", "+noise", "Random", "(", "-size", "600x400", "xc:black", "-fill", "white", "-draw", "circle 300,200 300,20", "-blur", "0x6", ")", "-alpha", "off", "-compose", "CopyOpacity", "-composite", "{tmp:in.png}"],
+  ["magick", "hald:8", "{tmp:id.png}"],
+]
+run    = ["grade", "apply", "--clut", "{tmp:id.png}", "{tmp:in.png}", "{tmp:out.png}"]
+metric = "rmse"
+params = { a = "{tmp:in.png}", b = "{tmp:out.png}", channels = "alpha" }
+max    = 0.0

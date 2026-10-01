@@ -1,7 +1,13 @@
 package quality
 
 import (
+	"math"
+	"strconv"
+	"strings"
+
 	"fmt"
+	"github.com/makiuchi-d/gozxing"
+	"github.com/makiuchi-d/gozxing/qrcode"
 
 	"github.com/lockyc/imgkit/internal/raster"
 )
@@ -87,4 +93,69 @@ func rmse(p Params) (float64, error) {
 		return 0, fmt.Errorf("channels: want rgb or alpha")
 	}
 	return raster.RMSE(a, b, r, ch)
+}
+
+func init() {
+	Metrics["dpi"] = dpi
+	Metrics["pixel"] = pixel
+	Metrics["qr-decodes"] = qrDecodes
+}
+
+func dpi(p Params) (float64, error) {
+	path, err := p.Path("image")
+	if err != nil {
+		return 0, err
+	}
+	return raster.DPI(path)
+}
+
+// pixel is the RMS channel distance, 0..1, between the pixel at `at` (x,y
+// fractions) and `color`.
+func pixel(p Params) (float64, error) {
+	path, err := p.Path("image")
+	if err != nil {
+		return 0, err
+	}
+	img, err := raster.Load(path)
+	if err != nil {
+		return 0, err
+	}
+	xs, ys, _ := strings.Cut(p.String("at", ""), ",")
+	fx, err1 := strconv.ParseFloat(xs, 64)
+	fy, err2 := strconv.ParseFloat(ys, 64)
+	hex := strings.TrimPrefix(p.String("color", ""), "#")
+	want, err3 := strconv.ParseUint(hex, 16, 32)
+	if err1 != nil || err2 != nil || err3 != nil || len(hex) != 6 {
+		return 0, fmt.Errorf("pixel: want at = \"x,y\" and color = \"#rrggbb\"")
+	}
+	b := img.Bounds()
+	c := img.RGBA64At(b.Min.X+int(math.Round(fx*float64(b.Dx()-1))), b.Min.Y+int(math.Round(fy*float64(b.Dy()-1))))
+	var sum float64
+	for i, v := range []uint16{c.R, c.G, c.B} {
+		w := float64((want>>(16-8*i))&0xff) / 255
+		d := float64(v)/65535 - w
+		sum += d * d
+	}
+	return math.Sqrt(sum / 3), nil
+}
+
+// qrDecodes is 1 when image decodes to text, else 0.
+func qrDecodes(p Params) (float64, error) {
+	path, err := p.Path("image")
+	if err != nil {
+		return 0, err
+	}
+	img, err := raster.Load(path)
+	if err != nil {
+		return 0, err
+	}
+	bmp, err := gozxing.NewBinaryBitmapFromImage(img)
+	if err != nil {
+		return 0, err
+	}
+	res, err := qrcode.NewQRCodeReader().Decode(bmp, nil)
+	if err != nil || res.GetText() != p.String("text", "") {
+		return 0, nil
+	}
+	return 1, nil
 }
