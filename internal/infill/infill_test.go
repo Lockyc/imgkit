@@ -23,7 +23,7 @@ func pngOf(t *testing.T, dir, name string, w, h int) string {
 }
 
 // holedPNG writes a w x h grey image with faint grain and a transparent
-// square in the middle, and with band a dark strip along the bottom: what
+// square in the middle, and with band a dark band over the bottom quarter: what
 // the magick stub hands back for every call, so the Go steps have a hole and
 // a ground to work on.
 func holedPNG(t *testing.T, dir string, w, h int, band bool) string {
@@ -32,7 +32,7 @@ func holedPNG(t *testing.T, dir string, w, h int, band bool) string {
 		for x := 0; x < w; x++ {
 			if x < w/2-5 || x >= w/2+5 || y < h/2-5 || y >= h/2+5 {
 				v := uint8(120 + (x*7+y*13)%5)
-				if band && y >= h-4 {
+				if band && y >= 3*h/4 {
 					v = 20
 				}
 				img.Set(x, y, color.NRGBA{v, v, v, 255})
@@ -54,9 +54,9 @@ func TestInfill(t *testing.T) {
 		t.Run(fmt.Sprintf("grain %s band %v", c.grain, c.band), func(t *testing.T) {
 			dir := t.TempDir()
 			t.Chdir(dir)
-			t.Setenv("FIXTURE", holedPNG(t, dir, 40, 30, c.band))
+			t.Setenv("FIXTURE", holedPNG(t, dir, 80, 60, c.band))
 			log := enginetest.Stub(t, "magick", `for a in "$@"; do last=$a; done; cp "$FIXTURE" "$last"`)
-			in, mask, out := pngOf(t, dir, "in.png", 40, 30), pngOf(t, dir, "m.png", 40, 30), filepath.Join(dir, "out.png")
+			in, mask, out := pngOf(t, dir, "in.png", 80, 60), pngOf(t, dir, "m.png", 80, 60), filepath.Join(dir, "out.png")
 			var o, e bytes.Buffer
 			if code := Main(context.Background(), []string{"--mask", mask, "--levels", "30,6", "--grain", c.grain, in, out}, &o, &e); code != 0 {
 				t.Fatalf("code %d: %s", code, e.String())

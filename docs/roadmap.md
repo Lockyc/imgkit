@@ -35,3 +35,11 @@ Phases run in order. Within a phase, order is open.
   (`maxBand` in internal/cutout) reads that as a haze. Deferred because no
   measured subject is like that. Unlock: a `quality/` case with such a
   subject, then a `--max-band` flag measured on it.
+- **infill edge stops across holes in one cluster.** Holes whose crops
+  overlap (within 3× the coarsest `--levels` radius of each other) share one
+  edge-stop flood, so two holes on opposite sides of a strong edge each
+  reach, and keep, the other's ground, and both bleed as before. Deferred
+  because no measured mask has holes like that: the cases have one hole,
+  and a per-hole flood costs a crop per hole. Unlock: a `quality/` case with
+  two holes either side of an edge, then a flood per hole (one hole's
+  pieces cutting only its own levels) measured on it.
