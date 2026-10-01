@@ -331,7 +331,7 @@ absent = ["{tmp:out.png}"]
 
 [[case]]
 name   = "upscale-beats-resampling"
-why    = "a 4x-reduced photo must come back closer than plain resampling brings it; a GAN painted the fabric weave as satin and lost to Lanczos"
+why    = "a 4x-reduced photo must come back closer than plain resampling brings it"
 setup  = [["magick", "{asset:detail-photo.jpg}", "-resize", "25%", "{tmp:small.png}"]]
 run    = ["upscale", "{tmp:small.png}", "{tmp:up.png}"]
 post   = [["magick", "{tmp:up.png}", "-resize", "2000x1330!", "{tmp:up-fit.png}"], ["magick", "{asset:detail-photo.jpg}", "{tmp:orig.png}"]]
@@ -368,6 +368,26 @@ post   = [["magick", "{asset:illustration.jpg}", "{tmp:orig.png}"]]
 metric = "detail"
 params = { a = "{tmp:up.png}", b = "{tmp:orig.png}" }
 min    = 0.50
+
+[[case]]
+name   = "upscale-16bit-grey"
+why    = "a 16-bit greyscale ramp must keep its tones, not clip toward white"
+setup  = [["magick", "-size", "16x128", "gradient:white-black", "-rotate", "90", "-colorspace", "gray", "-depth", "16", "{tmp:grey.png}"]]
+run    = ["upscale", "{tmp:grey.png}", "{tmp:up.png}"]
+post   = [["magick", "{tmp:up.png}", "-resize", "128x16!", "{tmp:back.png}"], ["magick", "{tmp:grey.png}", "-depth", "8", "PNG24:{tmp:ref.png}"]]
+metric = "rmse"
+params = { a = "{tmp:back.png}", b = "{tmp:ref.png}" }
+max    = 0.001
+
+[[case]]
+name   = "upscale-palette-alpha"
+why    = "a palette PNG whose transparency is a tRNS chunk must come back with that transparency"
+setup  = [["magick", "-size", "64x64", "xc:#c0392b", "-alpha", "set", "-fill", "none", "-draw", "color 0,0 reset", "-fill", "#c0392b", "-draw", "circle 32,32 32,8", "-type", "PaletteAlpha", "{tmp:pal.png}"], ["magick", "{tmp:pal.png}", "-alpha", "extract", "-filter", "Lanczos", "-resize", "400%", "PNG24:{tmp:ref.png}"]]
+run    = ["upscale", "{tmp:pal.png}", "{tmp:up.png}"]
+post   = [["magick", "{tmp:up.png}", "-alpha", "extract", "PNG24:{tmp:alpha.png}"]]
+metric = "rmse"
+params = { a = "{tmp:alpha.png}", b = "{tmp:ref.png}" }
+max    = 0.0034
 
 [[case]]
 name   = "grade-fit-recovers-treatment"

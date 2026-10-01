@@ -2,6 +2,7 @@ package quality
 
 import (
 	"image"
+	"math"
 	"image/color"
 	"path/filepath"
 	"testing"
@@ -205,6 +206,29 @@ func TestDetail(t *testing.T) {
 	}
 	orig := save("o.png", noise(1))
 	flat := save("f.png", func(x, y int) uint8 { return 127 })
+	// A Gaussian passes every frequency at a gain between 0 and 1, so the
+	// detail it keeps is a share strictly between none and all.
+	gauss := func(sigma float64) func(x, y int) uint8 {
+		r := int(math.Ceil(3 * sigma))
+		return func(x, y int) uint8 {
+			var s, n float64
+			for dy := -r; dy <= r; dy++ {
+				for dx := -r; dx <= r; dx++ {
+					if x+dx >= 0 && x+dx < 48 && y+dy >= 0 && y+dy < 48 {
+						k := math.Exp(-float64(dx*dx+dy*dy) / (2 * sigma * sigma))
+						s += k * float64(noise(1)(x+dx, y+dy))
+						n += k
+					}
+				}
+			}
+			return uint8(math.Round(s / n))
+		}
+	}
+	light, _ := Metrics["detail"](Params{"a": save("l.png", gauss(0.6)), "b": orig})
+	heavy, _ := Metrics["detail"](Params{"a": save("h.png", gauss(2)), "b": orig})
+	if !(0 < heavy && heavy < light && light < 1) {
+		t.Errorf("detail: light blur %v, heavy blur %v; want 0 < heavy < light < 1", light, heavy)
+	}
 	wrong := save("w.png", noise(2))
 	for _, c := range []struct {
 		name, a string

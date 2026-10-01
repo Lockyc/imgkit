@@ -6,17 +6,18 @@
 # ///
 """upscale.py -- enlarge 4x with DAT (Dual Aggregation Transformer, x4).
 
-    upscale.py --image in.png --out out.png --model REPO --revision SHA --file WEIGHTS
+    upscale.py --image frame.png --out out.png --model REPO --revision SHA --file WEIGHTS
 
-DAT is trained for fidelity to the original, so it sharpens the edges and
-strokes that survive in the small image and invents no texture. The GAN
-models (Real-ESRGAN x4plus and its relatives) paint fabric weave as satin
-and redraw a painting's brushwork as crisp outlines, and came out further
-from the original than plain Lanczos.
+The image is imgkit's normalised frame: oriented, sRGB, 8-bit RGBA. DAT is
+trained for fidelity to the original, so it sharpens the edges and strokes
+that survive in the small image and invents no texture.
 
-The image runs in TILE x TILE px tiles, each with PAD px of context on every
-side that is cut away again, so memory stays near 2 GB at any size and no
-seam shows. Alpha, which the model does not take, is enlarged with Lanczos.
+The model runs on TILE x TILE px tiles, each with PAD px of context on every
+side that is cut away again, and each tile is written straight into an
+8-bit output array. Peak memory is that array (scale^2 x 3-4 bytes per
+source pixel), the model and one tile's activations. Alpha, which the model
+does not take, is enlarged with Lanczos, and dropped when it is opaque
+everywhere.
 """
 
 import argparse
@@ -52,10 +53,13 @@ def main() -> None:
 
     src = Image.open(a.image)
     alpha = src.getchannel("A") if "A" in src.getbands() else None
+    if alpha is not None and alpha.getextrema() == (255, 255):
+        alpha = None
     rgb = np.asarray(src.convert("RGB"), dtype=np.float32) / 255
     h, w, _ = rgb.shape
     x = torch.from_numpy(rgb).permute(2, 0, 1)[None]
-    out = torch.zeros(1, 3, h * scale, w * scale)
+    del rgb
+    out = np.empty((h * scale, w * scale, 3), dtype=np.uint8)
     tiles = 0
     for y0 in range(0, h, TILE):
         for x0 in range(0, w, TILE):
@@ -66,14 +70,14 @@ def main() -> None:
             th, tw = t.shape[-2:]
             t = torch.nn.functional.pad(t, (0, (-tw) % mult, 0, (-th) % mult), mode="replicate")
             with torch.no_grad():
-                o = model(t.to(device)).float().cpu()
+                o = model(t.to(device))[0]
             oy, ox = (y0 - ya) * scale, (x0 - xa) * scale
-            out[..., y0 * scale : y1 * scale, x0 * scale : x1 * scale] = o[
-                ..., oy : oy + (y1 - y0) * scale, ox : ox + (x1 - x0) * scale
-            ]
+            o = o[:, oy : oy + (y1 - y0) * scale, ox : ox + (x1 - x0) * scale]
+            o = (o.float().clamp(0, 1) * 255 + 0.5).to(torch.uint8).permute(1, 2, 0).cpu().numpy()
+            out[y0 * scale : y1 * scale, x0 * scale : x1 * scale] = o
             tiles += 1
-    pixels = (out[0].clamp(0, 1).permute(1, 2, 0).numpy() * 255 + 0.5).astype(np.uint8)
-    img = Image.fromarray(pixels)
+    img = Image.fromarray(out)
+    del out
     if alpha is not None:
         img.putalpha(alpha.resize(img.size, Image.Resampling.LANCZOS))
     img.save(a.out)

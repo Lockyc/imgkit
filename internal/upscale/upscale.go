@@ -1,5 +1,7 @@
 // Package upscale enlarges an image 4× with DAT (internal/ml/scripts/
-// upscale.py), for artwork with no larger original. It synthesises detail,
+// upscale.py), for artwork with no larger original. The model reads the
+// normalised frame (internal/frame), so rotation, colour profile, bit depth
+// and palette transparency are handled once. It synthesises detail,
 // so imgkit.toml can forbid it. A project that forbids synthesis resamples
 // plainly in its recipe instead.
 package upscale
@@ -13,6 +15,8 @@ import (
 	"strings"
 
 	"github.com/lockyc/imgkit/internal/cli"
+	"github.com/lockyc/imgkit/internal/engine"
+	imgframe "github.com/lockyc/imgkit/internal/frame"
 	"github.com/lockyc/imgkit/internal/ml"
 	"github.com/lockyc/imgkit/internal/pins"
 	"github.com/lockyc/imgkit/internal/policy"
@@ -46,7 +50,21 @@ func run(ctx context.Context, in, out string) error {
 	if err := policy.CheckSynthesis(wd, "upscale"); err != nil {
 		return err
 	}
-	args := []string{"--image", in, "--out", out, "--model", pins.DAT.Repo, "--revision", pins.DAT.Revision, "--file", pins.DAT.File}
-	_, err = ml.RunScript(ctx, "upscale.py", args, []string{in}, []string{out})
+	// The model reads a temporary frame, so no engine call names both <in>
+	// and <out>; this is the one place that can refuse them being the same.
+	if engine.SameFile(in, out) {
+		return fmt.Errorf("%s is both an input and an output", in)
+	}
+	tmp, err := os.MkdirTemp("", "imgkit-upscale-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmp)
+	frame := filepath.Join(tmp, "frame.png")
+	if err := imgframe.Write(ctx, in, frame, imgframe.Options{}); err != nil {
+		return err
+	}
+	args := []string{"--image", frame, "--out", out, "--model", pins.DAT.Repo, "--revision", pins.DAT.Revision, "--file", pins.DAT.File}
+	_, err = ml.RunScript(ctx, "upscale.py", args, []string{frame}, []string{out})
 	return err
 }
