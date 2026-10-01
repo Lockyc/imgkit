@@ -1,9 +1,8 @@
 // Package cutout lifts the subject out of an image as RGBA at the source's
 // framing: a coarse mask (Apple Vision or BiRefNet) as the prior, ViTMatte
 // re-solving a wide band of it over the whole frame at up to contextSide²
-// px and
-// then the edge at full resolution in tiles, foreground estimation to
-// lift the background's tint out of soft edges, and an optional despill.
+// px and then the edge at full resolution in tiles, foreground estimation
+// to lift the background's tint out of soft edges, and an optional despill.
 // Every step computes alpha or un-mixes captured colour, so cutout is not
 // a synthesising command. The output is PNG: a soft matte edge is exactly
 // the artefact print cannot hide, and lossy alpha damages it.
@@ -23,6 +22,7 @@ import (
 	"github.com/lockyc/imgkit/internal/cli"
 	"github.com/lockyc/imgkit/internal/engine"
 	imgframe "github.com/lockyc/imgkit/internal/frame"
+	"github.com/lockyc/imgkit/internal/imgsize"
 	"github.com/lockyc/imgkit/internal/ml"
 	"github.com/lockyc/imgkit/internal/pins"
 	"github.com/lockyc/imgkit/internal/raster"
@@ -73,17 +73,24 @@ func defaultCoarse() string {
 	return "birefnet"
 }
 
-// isPair reports whether s is A:B with numbers A < B.
+// isPair reports whether s is A:B with finite numbers A < B.
 func isPair(s string) bool {
 	a, b, ok := strings.Cut(s, ":")
-	x, e1 := strconv.ParseFloat(a, 64)
-	y, e2 := strconv.ParseFloat(b, 64)
-	return ok && e1 == nil && e2 == nil && x < y
+	x, e1 := finite(a)
+	y, e2 := finite(b)
+	return ok && e1 && e2 && x < y
 }
 
 func isNumber(s string) bool {
-	_, err := strconv.ParseFloat(s, 64)
-	return err == nil
+	_, ok := finite(s)
+	return ok
+}
+
+// finite parses s as a number, refusing NaN and the infinities, which
+// ParseFloat accepts.
+func finite(s string) (float64, bool) {
+	v, err := strconv.ParseFloat(s, 64)
+	return v, err == nil && !math.IsNaN(v) && !math.IsInf(v, 0)
 }
 
 type job struct {
@@ -97,7 +104,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fs := cli.Flags("cutout", usage, stderr)
 	coarse := fs.String("coarse", defaultCoarse(), "coarse mask: vision (macOS) or birefnet")
 	height := fs.Int("height", 0, "working height in px, never above the source; at least the largest size the cut-out will be drawn at (0 = source height)")
-	tile := fs.Int("tile", 1024, fmt.Sprintf("ViTMatte tile size in px, above the %d px overlap; 0 runs the whole frame (memory grows with the fourth power of height)", overlap))
+	tile := fs.Int("tile", 1024, fmt.Sprintf("ViTMatte tile size in px, above the %d px overlap; 0 runs the whole frame (memory grows with the square of its pixel count)", overlap))
 	bin := fs.Int("band-in", 12, "sure foreground of the context pass: the coarse mask eroded by height/D; lower it when the coarse mask swallows background deeper behind hair or fur, raise it when a part of the subject is thinner than about 2·height/D")
 	bout := fs.Int("band-out", 40, "sure background: beyond the coarse mask dilated by height/D")
 	preset := fs.String("despill", "", "despill preset: warm-on-green; the --despill-* flags override its values")
@@ -193,7 +200,6 @@ func (j job) run(ctx context.Context) (int, int, error) {
 	if h > sh {
 		return 0, 0, fmt.Errorf("--height %d would upsample the %d px source; a cut-out is never upsampled", h, sh)
 	}
-	cw, ch := contextSize(int(math.Round(float64(sw)*float64(h)/float64(sh))), h)
 	tmp, err := os.MkdirTemp("", "imgkit-cutout-")
 	if err != nil {
 		return 0, 0, err
@@ -203,6 +209,11 @@ func (j job) run(ctx context.Context) (int, int, error) {
 	if err := imgframe.Write(ctx, j.in, frame, imgframe.Options{Height: h, Opaque: true}); err != nil {
 		return 0, 0, err
 	}
+	fw, fh, err := imgsize.Dims(frame)
+	if err != nil {
+		return 0, 0, err
+	}
+	cw, ch := contextSize(fw, fh)
 	if err := j.coarseMask(ctx, frame, mask, tmp); err != nil {
 		return 0, 0, err
 	}
@@ -221,12 +232,12 @@ func (j job) run(ctx context.Context) (int, int, error) {
 	if _, err := ml.RunScript(ctx, "matte.py", args, []string{frame, mask}, []string{j.out}); err != nil {
 		return 0, 0, err
 	}
-	out, err := raster.Load(j.out)
+	ow, oh, err := imgsize.Dims(j.out)
 	if err != nil {
 		os.Remove(j.out)
 		return 0, 0, err
 	}
-	return out.Bounds().Dx(), out.Bounds().Dy(), nil
+	return ow, oh, nil
 }
 
 func (j job) coarseMask(ctx context.Context, frame, mask, tmp string) error {
@@ -265,6 +276,11 @@ func (j job) coarseMask(ctx context.Context, frame, mask, tmp string) error {
 // confident region or a band of 92% and up. 2.5% holds for that
 // population, 2.6× above the widest subject and 3.2× below the narrowest
 // empty frame.
+//
+// Two blind spots. Confident speckles, scattered pixels at 95% and up in an
+// uncertain haze, each add perimeter, so such a mask reads as a narrow band
+// and passes. And every frame measured was about 600 px or more on its long
+// side; below that the bound is unmeasured.
 const maxBand = 0.025
 
 // hasForeground refuses a coarse mask that found no subject: one that marks
@@ -315,7 +331,7 @@ func hasForeground(mask string) error {
 		if share < 1 {
 			width = fmt.Sprintf("%.1f%% of the frame's long side", 100*share)
 		}
-		return fmt.Errorf("no foreground found: %.0f%% of the coarse mask is neither clearly subject nor background, a band around what it marks as subject averaging %s", 100*float64(uncertain)/float64(claimed), width)
+		return fmt.Errorf("no foreground found: %.0f%% of the pixels the coarse mask marks at all are neither clearly subject nor background, a band around what it marks as subject averaging %s", 100*float64(uncertain)/float64(claimed), width)
 	}
 	return nil
 }

@@ -35,10 +35,14 @@ case "$script" in
 esac`
 
 func png(t *testing.T, fill color.Color) string {
+	return pngSized(t, fill, 8, 12)
+}
+
+func pngSized(t *testing.T, fill color.Color, w, h int) string {
 	t.Helper()
-	img := image.NewRGBA(image.Rect(0, 0, 8, 12))
-	for y := 0; y < 12; y++ {
-		for x := 0; x < 8; x++ {
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
 			img.Set(x, y, fill)
 		}
 	}
@@ -75,6 +79,7 @@ func (e *env) run(args ...string) int {
 
 func TestCutoutBirefnet(t *testing.T) {
 	e := setup(t)
+	t.Setenv("FIXTURE_FRAME", pngSized(t, color.RGBA{200, 150, 100, 255}, 400, 600))
 	if code := e.run("--coarse", "birefnet", "--height", "600"); code != 0 {
 		t.Fatalf("code %d: %s", code, e.stderr.String())
 	}
@@ -129,10 +134,23 @@ func TestContextSize(t *testing.T) {
 func TestCutoutWideFrameContext(t *testing.T) {
 	e := setup(t)
 	t.Setenv("SRC_DIMS", "3000x1000")
+	t.Setenv("FIXTURE_FRAME", pngSized(t, color.RGBA{200, 150, 100, 255}, 3000, 1000))
 	if code := e.run("--coarse", "birefnet"); code != 0 {
 		t.Fatalf("code %d: %s", code, e.stderr.String())
 	}
 	wantFlags(t, matteCall(t, e), map[string]string{"--context-width": "1773", "--context-height": "591"})
+}
+
+// TestCutoutContextReadsFrame: the context pass is sized from the frame
+// magick wrote, not from an estimate of its width, which rounding can miss.
+func TestCutoutContextReadsFrame(t *testing.T) {
+	e := setup(t)
+	t.Setenv("SRC_DIMS", "1001x1000")
+	t.Setenv("FIXTURE_FRAME", pngSized(t, color.RGBA{200, 150, 100, 255}, 599, 600))
+	if code := e.run("--coarse", "birefnet", "--height", "600"); code != 0 {
+		t.Fatalf("code %d: %s", code, e.stderr.String())
+	}
+	wantFlags(t, matteCall(t, e), map[string]string{"--context-width": "599", "--context-height": "600"})
 }
 
 func TestWholeFrameTile(t *testing.T) {
@@ -194,6 +212,10 @@ func TestInvalidValuesRefused(t *testing.T) {
 		{"--despill", "warm-on-green", "--despill-hue-end", "x"},
 		{"--despill", "warm-on-green", "--despill-hue", "100:70"},
 		{"--despill", "warm-on-green", "--despill-clean", "50:50"},
+		{"--despill", "warm-on-green", "--despill-lmax", "nan"},
+		{"--despill", "warm-on-green", "--despill-hue-end", "inf"},
+		{"--despill", "warm-on-green", "--despill-hue", "-inf:100"},
+		{"--despill", "warm-on-green", "--despill-chroma", "6:+Inf"},
 	} {
 		e := setup(t)
 		if code := e.run(append([]string{"--coarse", "birefnet"}, args...)...); code != 2 {

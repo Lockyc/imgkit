@@ -141,7 +141,7 @@ max    = 0.001
 
 [[case]]
 name   = "cutout-chin-not-seethrough"
-why    = "dark hair across a chin reads as a gap to a wide band; a context band of 11 instead of 12 punched a 24% see-through hole there"
+why    = "dark hair across a chin reads as a gap to a wide band; a context band of 11 instead of 12 punched a 25% see-through hole there"
 run    = ["cutout", "{asset:portrait-foliage.jpg}", "{tmp:cut.png}"]
 metric = "seethrough"
 params = { image = "{tmp:cut.png}", solid = "0.565,0.47 0.645,0.47 0.645,0.525 0.565,0.525" }
