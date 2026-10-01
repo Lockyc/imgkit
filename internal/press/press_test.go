@@ -194,3 +194,41 @@ func TestPressRefusesInputAsOutput(t *testing.T) {
 		t.Error("gs ran")
 	}
 }
+
+func TestPressRefusesProfileAsOutput(t *testing.T) {
+	e := setup(t)
+	e.out = e.icc
+	if code := e.run(); code != 1 {
+		t.Fatalf("code %d", code)
+	}
+	if b, err := os.ReadFile(e.icc); err != nil || string(b) != "icc" {
+		t.Errorf("the profile did not survive: %q, %v", b, err)
+	}
+}
+
+func TestPressFailureLeavesNoStaleMaster(t *testing.T) {
+	e := setup(t)
+	os.WriteFile(e.out, []byte("stale"), 0o644)
+	t.Setenv("PAGES", "2")
+	t.Setenv("PAGE_LINES", "Page    1 size: 900 x 675 pts\nPage    2 size: 612 x 792 pts")
+	if code := e.run(); code != 1 {
+		t.Fatalf("code %d", code)
+	}
+	if e.outExists() {
+		t.Error("a stale master survived a failed run")
+	}
+}
+
+func TestPressRejectsNonPositiveLimits(t *testing.T) {
+	for _, f := range []string{"--max-ppi", "--max-rmse", "--proof-width"} {
+		for _, v := range []string{"0", "-1"} {
+			e := setup(t)
+			if code := e.run(f, v); code != 2 {
+				t.Errorf("%s %s: code %d", f, v, code)
+			}
+			if len(enginetest.Calls(t, e.gs)) != 0 {
+				t.Errorf("%s %s: gs ran", f, v)
+			}
+		}
+	}
+}

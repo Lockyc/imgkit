@@ -36,6 +36,8 @@ const usage = "press --icc profile.icc [--max-ppi N] [--max-rmse R] [--region x,
 // master: a gate that cannot fail is decoration.
 const defaultMaxRMSE = 0.085
 
+const gsTimeout = 30 * time.Minute
+
 // nonCMYK matches every colour space and RGB fill/stroke operator that may
 // not appear in a master, in qpdf's uncompressed QDF form.
 var nonCMYK = regexp.MustCompile(`(?m)/(DeviceRGB|CalRGB|ICCBased|Lab|Indexed|Separation|DeviceN)\b| (rg|RG)$`)
@@ -76,6 +78,15 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "imgkit press: --icc is required")
 		fs.Usage()
 		return 2
+	}
+	for _, c := range []struct {
+		flag string
+		ok   bool
+	}{{"max-ppi", *maxPPI > 0}, {"max-rmse", *maxRMSE > 0}, {"proof-width", *proofWidth > 0}} {
+		if !c.ok {
+			fmt.Fprintf(stderr, "imgkit press: --%s must be greater than 0\n", c.flag)
+			return 2
+		}
 	}
 	j := job{maxPPI: *maxPPI, maxRMSE: *maxRMSE, proofWidth: *proofWidth, log: stdout}
 	for _, s := range specs {
@@ -118,6 +129,19 @@ func parseRegion(s string) (region, error) {
 func pt(v float64) string { return strconv.FormatFloat(v, 'f', -1, 64) }
 
 func (j job) run(ctx context.Context) (err error) {
+	for _, other := range []string{j.in, j.icc} {
+		if engine.SameFile(other, j.out) {
+			return fmt.Errorf("the output is the same file as an input, %s", j.out)
+		}
+	}
+	if err := os.Remove(j.out); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			os.Remove(j.out)
+		}
+	}()
 	src, err := pdf.Read(ctx, j.in)
 	if err != nil {
 		return err
@@ -131,17 +155,6 @@ func (j job) run(ctx context.Context) (err error) {
 			return fmt.Errorf("page %d is %gx%g pt and page 1 is %gx%g pt; press fixes one media size for the whole file", i+1, s[0], s[1], sizes[0][0], sizes[0][1])
 		}
 	}
-	if engine.SameFile(j.in, j.out) {
-		return fmt.Errorf("the input and output are the same file, %s", j.out)
-	}
-	if err := os.Remove(j.out); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return err
-	}
-	defer func() {
-		if err != nil {
-			os.Remove(j.out)
-		}
-	}()
 	ppi := pt(j.maxPPI)
 	// gs imposes its own media and shifts the artwork onto it unless the
 	// source's box is forced. Its pdfwrite defaults downsample to 72 dpi and
@@ -162,7 +175,7 @@ func (j job) run(ctx context.Context) (err error) {
 		"-dColorImageDownsampleThreshold=1.5", "-dGrayImageDownsampleThreshold=1.5",
 		"-dDownsampleMonoImages=false",
 		"-sOutputFile=" + j.out, j.in}
-	if _, err := engine.Run(ctx, engine.Cmd{Engine: "gs", Args: args, StderrFatal: true, Inputs: []string{j.in, j.icc}, Outputs: []string{j.out}, Timeout: 30 * time.Minute}); err != nil {
+	if _, err := engine.Run(ctx, engine.Cmd{Engine: "gs", Args: args, StderrFatal: true, Inputs: []string{j.in, j.icc}, Outputs: []string{j.out}, Timeout: gsTimeout}); err != nil {
 		return err
 	}
 	return j.verify(ctx, src)
@@ -250,11 +263,11 @@ func (j job) proof(ctx context.Context, tmp string, src pdf.Info) error {
 	common := []string{"-q", "-dBATCH", "-dNOPAUSE", "-dSAFER", "-sDEVICE=png16m", "-r" + dpi, "-dTextAlphaBits=4", "-dGraphicsAlphaBits=4"}
 	srcPat, outPat := filepath.Join(tmp, "src-%d.png"), filepath.Join(tmp, "out-%d.png")
 	first := func(pat string) []string { return []string{strings.Replace(pat, "%d", "1", 1)} }
-	if _, err := engine.Run(ctx, engine.Cmd{Engine: "gs", Args: append(common, "-sOutputFile="+srcPat, j.in), StderrFatal: true, Inputs: []string{j.in}, Outputs: first(srcPat), Timeout: 30 * time.Minute}); err != nil {
+	if _, err := engine.Run(ctx, engine.Cmd{Engine: "gs", Args: append(common, "-sOutputFile="+srcPat, j.in), StderrFatal: true, Inputs: []string{j.in}, Outputs: first(srcPat), Timeout: gsTimeout}); err != nil {
 		return err
 	}
 	outArgs := append(common, "--permit-file-read="+j.icc, "-sDefaultCMYKProfile="+j.icc, "-dRenderIntent=1", "-dBlackPtComp=1", "-sOutputFile="+outPat, j.out)
-	if _, err := engine.Run(ctx, engine.Cmd{Engine: "gs", Args: outArgs, StderrFatal: true, Inputs: []string{j.out, j.icc}, Outputs: first(outPat), Timeout: 30 * time.Minute}); err != nil {
+	if _, err := engine.Run(ctx, engine.Cmd{Engine: "gs", Args: outArgs, StderrFatal: true, Inputs: []string{j.out, j.icc}, Outputs: first(outPat), Timeout: gsTimeout}); err != nil {
 		return err
 	}
 	for p := 1; p <= src.Pages; p++ {
