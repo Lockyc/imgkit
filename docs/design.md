@@ -106,7 +106,11 @@ colours, or renders what it is given.
 - **diff** — crops both images to their overlap, searches a vertical shift,
   and scores the share of pixels whose per-channel difference has a luma above
   the tolerance.
-- **infill, inpaint, upscale, fonts, qr** — as the README table describes.
+- **infill** — a blur pyramid over the known pixels, whose levels skip any
+  other ground cut off from a hole by a strong edge (internal/infill/reach.go),
+  then the ground's own grain transferred in patches from around each hole
+  (internal/infill/texture.go).
+- **inpaint, upscale, fonts, qr** — as the README table describes.
 
 ## Platforms and errors
 

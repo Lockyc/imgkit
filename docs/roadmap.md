@@ -43,3 +43,9 @@ Phases run in order. Within a phase, order is open.
   and a per-hole flood costs a crop per hole. Unlock: a `quality/` case with
   two holes either side of an edge, then a flood per hole (one hole's
   pieces cutting only its own levels) measured on it.
+- **infill edge stops at the finer levels.** A ground's pull on a hole is
+  weighed at the coarsest `--levels` radius only, so a small dark object at
+  a hole's border can be kept while the finer levels, which fill the hole's
+  rim, smudge it in. Deferred because no measured case shows it. Unlock:
+  a `quality/` case with a small dark object within about 2× the finest
+  radius of a hole's border, then a per-level pull measured on it.
