@@ -189,7 +189,9 @@ func TestRenderPDFFailIf(t *testing.T) {
 func TestRenderPDFWarnsOffGrid(t *testing.T) {
 	e := setup(t, 1, 1)
 	t.Setenv("PDF_BOX", "903 x 675 pts")
-	e.run("--size", "1204x900", "--pdf", e.out("p.pdf"), e.page)
+	if code := e.run("--size", "1204x900", "--pdf", e.out("p.pdf"), e.page); code != 0 {
+		t.Fatalf("code %d: %s", code, e.stderr.String())
+	}
 	if !strings.Contains(e.stderr.String(), "multiples of 8") {
 		t.Errorf("no warning: %q", e.stderr.String())
 	}
@@ -209,22 +211,61 @@ func TestRenderUsage(t *testing.T) {
 	}
 }
 
+func TestRenderRefusesPageAsOutput(t *testing.T) {
+	for _, flag := range []string{"--png", "--pdf"} {
+		e := setup(t, 1, 1)
+		if code := e.run("--size", "100x50", flag, e.page, e.page); code != 1 {
+			t.Fatalf("%s: code %d", flag, code)
+		}
+		if b, err := os.ReadFile(e.page); err != nil || string(b) != "<html></html>" {
+			t.Errorf("%s: page destroyed: %q %v", flag, b, err)
+		}
+		if len(enginetest.Calls(t, e.chrome)) != 0 {
+			t.Errorf("%s: chrome ran", flag)
+		}
+	}
+}
+
+func TestRenderBadScale(t *testing.T) {
+	e := setup(t, 1, 1)
+	for _, sc := range []string{"NaN", "Inf", "1e30"} {
+		code := e.run("--size", "100x50", "--scale", sc, "--png", e.out("p.png"), e.page)
+		want := 2
+		if sc == "1e30" {
+			want = 1
+		}
+		if code != want {
+			t.Errorf("--scale %s: code %d, want %d", sc, code, want)
+		}
+	}
+	if len(enginetest.Calls(t, e.chrome)) != 0 {
+		t.Error("chrome ran")
+	}
+}
+
+func TestRenderSameOutputPath(t *testing.T) {
+	e := setup(t, 1, 1)
+	if code := e.run("--size", "100x50", "--png", e.out("x"), "--pdf", e.out("x"), e.page); code != 2 {
+		t.Errorf("code %d, want 2", code)
+	}
+}
+
 func TestPageURLEscapes(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "a b#c%d")
 	os.MkdirAll(dir, 0o755)
 	p := filepath.Join(dir, "page.html")
 	os.WriteFile(p, nil, 0o644)
-	got, err := pageURL(p)
+	got, _, err := pageURL(p)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.HasPrefix(got, "file:///") || !strings.Contains(got, "a%20b%23c%25d/page.html") {
 		t.Errorf("pageURL = %q", got)
 	}
-	if u, _ := pageURL("https://example.org/x"); u != "https://example.org/x" {
+	if u, l, _ := pageURL("https://example.org/x"); l != "" || u != "https://example.org/x" {
 		t.Errorf("https URL rewritten to %q", u)
 	}
-	if _, err := pageURL(filepath.Join(t.TempDir(), "missing.html")); err == nil {
+	if _, _, err := pageURL(filepath.Join(t.TempDir(), "missing.html")); err == nil {
 		t.Error("missing page accepted")
 	}
 }

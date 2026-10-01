@@ -51,12 +51,13 @@ func (m *multi) String() string     { return strings.Join(*m, ", ") }
 func (m *multi) Set(s string) error { *m = append(*m, s); return nil }
 
 type job struct {
-	url, png, pdf string
-	w, h          int
-	scale         float64
-	budget        int
-	failIf        []string
-	warn          io.Writer
+	url, local string
+	png, pdf   string
+	w, h       int
+	scale      float64
+	budget     int
+	failIf     []string
+	warn       io.Writer
 }
 
 // Main runs `imgkit render`.
@@ -92,14 +93,17 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if j.png != "" && j.w == 0 {
 		return usageErr("--png needs --size")
 	}
-	if j.scale <= 0 || j.budget < 0 {
-		return usageErr("--scale must be above 0 and --budget not below 0")
+	if math.IsNaN(j.scale) || math.IsInf(j.scale, 0) || j.scale <= 0 || j.budget < 0 {
+		return usageErr("--scale must be a finite number above 0 and --budget not below 0")
 	}
-	u, err := pageURL(rest[0])
+	if j.png != "" && j.png == j.pdf {
+		return usageErr("--png and --pdf name the same file")
+	}
+	u, local, err := pageURL(rest[0])
 	if err != nil {
 		return cli.Fail(stderr, "render", err)
 	}
-	j.url = u
+	j.url, j.local = u, local
 	if err := j.run(ctx); err != nil {
 		return cli.Fail(stderr, "render", err)
 	}
@@ -116,18 +120,34 @@ func parseSize(s string) (int, int, error) {
 	return w, h, nil
 }
 
-func pageURL(arg string) (string, error) {
-	if u, err := url.Parse(arg); err == nil && (u.Scheme == "http" || u.Scheme == "https" || u.Scheme == "file") {
-		return arg, nil
+// pageURL returns the URL Chrome loads and the local file behind it ("" for
+// http and https).
+func pageURL(arg string) (string, string, error) {
+	if u, err := url.Parse(arg); err == nil {
+		switch u.Scheme {
+		case "http", "https":
+			return arg, "", nil
+		case "file":
+			return arg, filepath.FromSlash(u.Path), nil
+		}
 	}
 	abs, err := filepath.Abs(arg)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if _, err := os.Stat(abs); err != nil {
-		return "", err
+		return "", "", err
 	}
-	return (&url.URL{Scheme: "file", Path: abs}).String(), nil
+	return (&url.URL{Scheme: "file", Path: abs}).String(), abs, nil
+}
+
+// inputs lists the local page as an engine input, so the engine refuses an
+// output that is the page itself.
+func (j job) inputs() []string {
+	if j.local == "" {
+		return nil
+	}
+	return []string{j.local}
 }
 
 func (j job) run(ctx context.Context) (err error) {
@@ -135,6 +155,13 @@ func (j job) run(ctx context.Context) (err error) {
 	for _, o := range []string{j.png, j.pdf} {
 		if o != "" {
 			outputs = append(outputs, o)
+		}
+	}
+	if j.local != "" {
+		for _, o := range outputs {
+			if engine.SameFile(j.local, o) {
+				return fmt.Errorf("%s is the page being rendered; write the result elsewhere", o)
+			}
 		}
 	}
 	// Both outputs go first: whichever stage fails, no stale file from an
@@ -174,13 +201,13 @@ func (j job) base() []string {
 }
 
 func (j job) screenshot(ctx context.Context) error {
-	pw, ph := int(math.Round(float64(j.w)*j.scale)), int(math.Round(float64(j.h)*j.scale))
-	if pw > maxSide || ph > maxSide || pw*ph > maxPixels {
-		return fmt.Errorf("render would be %dx%d px (%.1f MP), beyond the %dx%d px verified whole on %s; render smaller or at a lower --scale",
-			pw, ph, float64(pw)*float64(ph)/1e6, maxSide, maxSide, chrome)
+	fw, fh := math.Round(float64(j.w)*j.scale), math.Round(float64(j.h)*j.scale)
+	if fw > maxSide || fh > maxSide || fw*fh > maxPixels {
+		return fmt.Errorf("render would be %gx%g px (%.1f MP), beyond the %dx%d px verified whole on %s; render smaller or at a lower --scale",
+			fw, fh, fw*fh/1e6, maxSide, maxSide, chrome)
 	}
 	if len(j.failIf) > 0 {
-		res, err := engine.Run(ctx, engine.Cmd{Engine: chrome, Args: append(j.base(), "--dump-dom", j.url), Timeout: 2 * time.Minute})
+		res, err := engine.Run(ctx, engine.Cmd{Engine: chrome, Args: append(j.base(), "--dump-dom", j.url), Inputs: j.inputs(), Timeout: 2 * time.Minute})
 		if err != nil {
 			return err
 		}
@@ -188,11 +215,12 @@ func (j job) screenshot(ctx context.Context) error {
 			return err
 		}
 	}
+	pw, ph := int(fw), int(fh)
 	args := append(j.base(),
 		"--force-device-scale-factor="+strconv.FormatFloat(j.scale, 'f', -1, 64),
 		fmt.Sprintf("--window-size=%d,%d", j.w, j.h),
 		"--screenshot="+j.png, j.url)
-	if _, err := engine.Run(ctx, engine.Cmd{Engine: chrome, Args: args, Outputs: []string{j.png}, Timeout: 15 * time.Minute}); err != nil {
+	if _, err := engine.Run(ctx, engine.Cmd{Engine: chrome, Args: args, Inputs: j.inputs(), Outputs: []string{j.png}, Timeout: 15 * time.Minute}); err != nil {
 		return err
 	}
 	f, err := os.Open(j.png)
@@ -217,7 +245,7 @@ func (j job) print(ctx context.Context) error {
 		fmt.Fprintf(j.warn, "imgkit render: warning: Chrome rounds PDF page sizes to multiples of 8 CSS px, so %dx%d will not print at exactly that size\n", j.w, j.h)
 	}
 	args := append(j.base(), "--no-pdf-header-footer", "--print-to-pdf="+j.pdf, j.url)
-	if _, err := engine.Run(ctx, engine.Cmd{Engine: chrome, Args: args, Outputs: []string{j.pdf}, Timeout: 15 * time.Minute}); err != nil {
+	if _, err := engine.Run(ctx, engine.Cmd{Engine: chrome, Args: args, Inputs: j.inputs(), Outputs: []string{j.pdf}, Timeout: 15 * time.Minute}); err != nil {
 		return err
 	}
 	if len(j.failIf) > 0 {

@@ -146,7 +146,7 @@ func (e *RunError) Error() string {
 func Run(ctx context.Context, c Cmd) (Result, error) {
 	for _, o := range c.Outputs {
 		for _, in := range c.Inputs {
-			if sameFile(in, o) {
+			if SameFile(in, o) {
 				return Result{}, fmt.Errorf("%s: %s is both an input and an output; write the result elsewhere", c.Engine, o)
 			}
 		}
@@ -173,9 +173,9 @@ func Run(ctx context.Context, c Cmd) (Result, error) {
 	return res, err
 }
 
-// sameFile reports whether a and b name one file: the same inode when both
+// SameFile reports whether a and b name one file: the same inode when both
 // exist, else the same absolute path.
-func sameFile(a, b string) bool {
+func SameFile(a, b string) bool {
 	fa, errA := os.Stat(a)
 	fb, errB := os.Stat(b)
 	if errA == nil && errB == nil {
