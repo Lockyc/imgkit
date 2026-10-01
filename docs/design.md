@@ -8,8 +8,8 @@ links:
 
 # imgkit — design
 
-The architecture imgkit is being built to; [roadmap.md](roadmap.md) tracks
-what is built and what comes next.
+The architecture imgkit is built to; [roadmap.md](roadmap.md) tracks what is
+built and what comes next.
 
 ## Shape
 
@@ -25,7 +25,9 @@ internal/<op>/       one package per command (cutout, inpaint, infill, upscale,
                      grade, render, press, diff, fonts, qr, doctor)
 internal/cli/        flag, exit-code and error conventions every command shares
 internal/engine/     the one way an external tool is run
-internal/frame/      the source pre-pass: oriented, sRGB, 8-bit RGB(A) PNG
+internal/frame/      the source pre-pass cutout and upscale read: oriented, sRGB,
+                     8-bit RGB(A) PNG
+internal/icc/        the embedded sRGB profile
 internal/enginetest/ sh stubs that stand in for engines in tests
 internal/pins/       the one table of engine versions
 internal/pdf/        PDF page count, page boxes and text through poppler
@@ -60,8 +62,9 @@ ahead of the data directory and `PATH`; tests use it to stand in sh stubs.
 | ImageMagick 7 | minimum version |
 | chrome-headless-shell | exact version and sha256, installed by `doctor --install` under `$XDG_DATA_HOME/imgkit/` |
 | Ghostscript, poppler, qpdf, qrencode | minimum version |
-| Apple Vision | the OS; macOS 14 or later |
-| Python ML (ViTMatte, BiRefNet, LaMa, DAT, grade fit) | PEP 723 header with `exclude-newer`, and a committed `uv lock --script` lockfile run with `--locked`; Hugging Face model revision pinned by commit |
+| Apple Vision | the OS; macOS 14 or later, plus `swiftc` as a minimum-version engine |
+| Python ML scripts (ViTMatte, BiRefNet, DAT, grade fit) | PEP 723 header with `exclude-newer`, and a committed `uv lock --script` lockfile run with `--locked`; ViTMatte and DAT weights pinned by Hugging Face commit in `internal/pins`, BiRefNet's by the pinned `rembg` version |
+| LaMa | the `iopaint` CLI, run through `uv tool run` at a pinned version and `exclude-newer` (`pins.IOPaint`) |
 
 Python runs only for the ML steps, where no Go, Rust or shell tool of
 comparable quality exists. `uv` is the only Python tool a user installs.
@@ -77,15 +80,18 @@ colours, or renders what it is given.
 ## Operations
 
 - **cutout** — a coarse mask (`--coarse vision`, the default on macOS, or
-  `birefnet`), then ViTMatte twice: over a wide band in one whole-frame pass
-  scaled to at most 1024² px, which re-solves background the mask swallowed
-  behind hair, then over a narrow band around that result at full
-  resolution, in 1024 px tiles overlapping by 128 px, so memory stays near
-  1 GB at any size and shape. Then the
-  foreground colour is estimated so soft edges lose the background's tint.
-  An optional despill pulls a named contaminating hue toward the local clean
-  colour. `--height` sets the working size, and it must never be smaller than
-  the largest size the cut-out will be drawn at.
+  `birefnet`), refused as "no foreground found" when it is empty or its soft
+  edge is wider than `maxBand` allows. Then ViTMatte twice: over a wide band
+  in one whole-frame pass bounded by `contextSide`, which re-solves
+  background the mask swallowed behind hair (`--band-in`, `--band-out`), then
+  over a narrow band around that result at full resolution, in `--tile` px
+  tiles, so memory stays flat at any size and shape; `--tile 0` runs the whole
+  frame instead. Then the foreground colour is estimated so soft edges lose
+  the background's tint. `--despill` takes a named preset (`warm-on-green`)
+  that pulls a contaminating hue toward the local clean colour; each of its
+  values has its own `--despill-*` flag, which overrides the preset.
+  `--height` sets the working size, and it must never be smaller than the
+  largest size the cut-out will be drawn at.
 - **render** — refuses a PNG beyond the largest size verified whole on the
   pinned engine (`render.maxSide`), since Chrome has cut large screenshots
   short with exit 0; checks the PNG is exactly size × scale. It warns when a
@@ -110,7 +116,10 @@ colours, or renders what it is given.
   other ground cut off from a hole by a strong edge (internal/infill/reach.go),
   then the ground's own grain transferred in patches from around each hole
   (internal/infill/texture.go).
-- **inpaint, upscale, fonts, qr** — as the README table describes.
+- **upscale** — DAT ×4 over the normalised frame in overlapping tiles
+  (internal/ml/scripts/upscale.py); alpha, which the model does not take, is
+  enlarged separately.
+- **inpaint, fonts, qr** — as the README table describes.
 
 ## Platforms and errors
 
@@ -126,7 +135,6 @@ plausible-looking wrong file behind.
 sh stubs in for engines through `IMGKIT_ENGINE_<NAME>`. `just quality` runs
 every operation over `quality/`: openly licensed or synthetic test images,
 each asset registered in `quality/assets.toml` with its source and licence,
-each case in `quality/cases.toml` (fields: `quality.Case`) with its metric and
-threshold (fringe pixels, see-through pixels inside the subject, seam
-visibility, a refused oversized render). It needs the models and runs
+each case in `quality/cases.toml` (fields: `quality.Case`) with its metric
+(`quality.Metrics`) and threshold, which only ever tightens. It needs the models and runs
 locally, not in CI.

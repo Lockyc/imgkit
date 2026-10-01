@@ -41,8 +41,9 @@ around imgkit, is the failure this rule exists to stop.
   `internal/engine`, and every version lives in `internal/pins`. Never call
   `exec.Command` from an op package, and never restate a version in a doc or
   error string.
-- **Python only for ML**, as embedded PEP 723 scripts with exact pins and a
-  pinned model revision.
+- **Python only for ML**, as embedded PEP 723 scripts with `exclude-newer`
+  and a committed lockfile run `--locked`, model revisions pinned in
+  `internal/pins`; upstream CLIs (LaMa) through `uv tool run`.
 - **Portable.** No GNU-only or BSD-only flags in anything imgkit runs.
 - **Mark synthesis.** A command that creates pixels the source never had
   honours the `imgkit.toml` policy (docs/design.md → Synthesis policy).
