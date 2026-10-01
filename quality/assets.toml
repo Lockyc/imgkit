@@ -66,3 +66,11 @@ author  = "SpongeLover08"
 licence = "CC0"
 recipe  = "resized and cropped by imgkit: magick SOURCE -resize 50% -crop 1500x1500+18+540 +repage -quality 92 -strip sky-ground.jpg"
 sha256  = "7cee9175cb1e874c4232a513cfa429738b845b07c97f24384a8d261659437b8b"
+
+[[asset]]
+file    = "illustration.jpg"
+source  = "https://commons.wikimedia.org/wiki/File:2024-09-01_Pepper_and_Carrot_in_traditional_clothing_of_Bergen_by_David_Revoy.jpg"
+author  = "David Revoy"
+licence = "CC BY 4.0"
+recipe  = "resized by imgkit: magick SOURCE -resize 2000x2000 -quality 92 -strip illustration.jpg"
+sha256  = "70c2c1542845343e5847779d9f7f340b093849c9e2693b469ce9b7073bf11d91"

@@ -340,6 +340,16 @@ params = { a = "{tmp:up-fit.png}", b = "{tmp:orig.png}" }
 max    = 0.076
 
 [[case]]
+name   = "upscale-beats-resampling-illustration"
+why    = "a 4x-reduced digital painting, line art over flat colour and brushwork, must come back closer than plain resampling brings it"
+setup  = [["magick", "{asset:illustration.jpg}", "-resize", "25%", "{tmp:small.png}"]]
+run    = ["upscale", "{tmp:small.png}", "{tmp:up.png}"]
+post   = [["magick", "{asset:illustration.jpg}", "{tmp:orig.png}"]]
+metric = "rmse"
+params = { a = "{tmp:up.png}", b = "{tmp:orig.png}" }
+max    = 0.021
+
+[[case]]
 name   = "grade-fit-recovers-treatment"
 why    = "fit must recover a known colour treatment from a shifted, scaled reference"
 setup  = [
