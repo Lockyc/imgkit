@@ -281,6 +281,16 @@ min    = 0.8
 max    = 1.1
 
 [[case]]
+name   = "infill-edge-bleed"
+why    = "a hole 30 px from a strong edge must take the colour of its own ground, not darken toward the edge"
+setup  = [["magick", "{asset:flat-ground.jpg}", "(", "-size", "1521x581", "xc:#2b2b2b", ")", "-geometry", "+0+940", "-compose", "multiply", "-composite", "{tmp:edge.png}"], ["magick", "-size", "1521x1521", "xc:black", "-fill", "white", "-draw", "circle 760,760 760,610", "{tmp:mask.png}"]]
+run    = ["infill", "--mask", "{tmp:mask.png}", "{tmp:edge.png}", "{tmp:out.png}"]
+post   = [["magick", "{tmp:out.png}", "-blur", "0x8", "{tmp:a.png}"], ["magick", "{tmp:edge.png}", "-blur", "0x8", "{tmp:b.png}"]]
+metric = "rmse"
+params = { a = "{tmp:a.png}", b = "{tmp:b.png}", mask = "{tmp:mask.png}" }
+max    = 0.014
+
+[[case]]
 name   = "inpaint-texture"
 why    = "LaMa must reconstruct a textured hole close to the original"
 setup  = [["magick", "-size", "2000x1330", "xc:black", "-fill", "white", "-draw", "circle 1000,665 1000,545", "{tmp:mask.png}"]]
