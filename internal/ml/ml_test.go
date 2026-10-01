@@ -128,3 +128,66 @@ func TestInputEqualToOutputIsRefused(t *testing.T) {
 		t.Errorf("uv ran despite the refusal: %q", c)
 	}
 }
+
+// TestScriptsShareTheDeviceRule: every script is materialised beside the
+// one device rule, which the torch scripts import.
+func TestScriptsShareTheDeviceRule(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	names, _ := fs.Glob(scripts, "scripts/*.py")
+	for _, n := range names {
+		p, err := Script(filepath.Base(n))
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, err := os.ReadFile(filepath.Join(filepath.Dir(p), deviceModule))
+		if err != nil || string(b) != string(deviceRule) {
+			t.Errorf("%s: device rule not beside it: %v", n, err)
+		}
+		src, _ := scripts.ReadFile(n)
+		if strings.Contains(string(src), "import torch") != strings.Contains(string(src), "from imgkit_device import pick") {
+			t.Errorf("%s imports torch but not the device rule, or the reverse", n)
+		}
+		if strings.Contains(string(src), ".is_available()") {
+			t.Errorf("%s decides its own device", n)
+		}
+	}
+}
+
+func TestToolDevice(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	tool := pins.PyTool{Package: "iopaint", Version: "1.6.0", ExcludeNewer: "2026-10-01T00:00:00Z"}
+	log := enginetest.Stub(t, "uv", `echo mps`)
+	d, err := ToolDevice(context.Background(), tool)
+	if err != nil || d != "mps" {
+		t.Fatalf("ToolDevice = %q, %v", d, err)
+	}
+	c := enginetest.Calls(t, log)[0]
+	if !slices.Equal(c[:8], []string{"tool", "run", "--from", "iopaint==1.6.0", "--exclude-newer", "2026-10-01T00:00:00Z", "python", c[7]}) || filepath.Base(c[7]) != deviceModule {
+		t.Errorf("args %q", c)
+	}
+	if b, err := os.ReadFile(c[7]); err != nil || string(b) != string(deviceRule) {
+		t.Errorf("device rule not materialised: %v", err)
+	}
+	enginetest.Stub(t, "uv", `exit 0`)
+	if _, err := ToolDevice(context.Background(), tool); err == nil {
+		t.Error("accepted no device")
+	}
+}
+
+// TestDeviceRule runs the rule under the scripts' own torch. Opt-in
+// (IMGKIT_REAL=1): it resolves torch.
+func TestDeviceRule(t *testing.T) {
+	if os.Getenv("IMGKIT_REAL") == "" {
+		t.Skip("set IMGKIT_REAL=1")
+	}
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	tool := pins.IOPaint
+	t.Setenv("IMGKIT_DEVICE", "cpu")
+	if d, err := ToolDevice(context.Background(), tool); err != nil || d != "cpu" {
+		t.Errorf("IMGKIT_DEVICE=cpu: %q, %v", d, err)
+	}
+	t.Setenv("IMGKIT_DEVICE", "tpu")
+	if _, err := ToolDevice(context.Background(), tool); err == nil || !strings.Contains(err.Error(), "IMGKIT_DEVICE") {
+		t.Errorf("IMGKIT_DEVICE=tpu accepted: %v", err)
+	}
+}

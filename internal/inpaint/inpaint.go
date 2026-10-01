@@ -21,29 +21,28 @@ import (
 	"github.com/lockyc/imgkit/internal/policy"
 )
 
-const usage = "inpaint --mask mask.png [--device cpu|mps] <in> <out.png>"
+const usage = "inpaint --mask mask.png <in> <out.png>"
 
 // Main runs `imgkit inpaint`.
 func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fs := cli.Flags("inpaint", usage, stderr)
 	mask := fs.String("mask", "", "white where LaMa fills, same size as the image (required)")
-	device := fs.String("device", "cpu", "cpu or mps")
 	rest, code, ok := cli.Parse(fs, args, 2)
 	if !ok {
 		return code
 	}
-	if *mask == "" || strings.ToLower(filepath.Ext(rest[1])) != ".png" || (*device != "cpu" && *device != "mps") {
-		fmt.Fprintln(stderr, "imgkit inpaint: give --mask, --device cpu|mps, and an output ending .png")
+	if *mask == "" || strings.ToLower(filepath.Ext(rest[1])) != ".png" {
+		fmt.Fprintln(stderr, "imgkit inpaint: give --mask and an output ending .png")
 		return 2
 	}
-	if err := run(ctx, rest[0], *mask, rest[1], *device); err != nil {
+	if err := run(ctx, rest[0], *mask, rest[1]); err != nil {
 		return cli.Fail(stderr, "inpaint", err)
 	}
 	fmt.Fprintf(stdout, "wrote %s\n", rest[1])
 	return 0
 }
 
-func run(ctx context.Context, in, mask, out, device string) error {
+func run(ctx context.Context, in, mask, out string) error {
 	wd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -85,6 +84,10 @@ func run(ctx context.Context, in, mask, out, device string) error {
 	}
 	if iw != mw || ih != mh {
 		return fmt.Errorf("the mask is %dx%d and the image %dx%d as displayed; iopaint would resize the mask silently", mw, mh, iw, ih)
+	}
+	device, err := ml.ToolDevice(ctx, pins.IOPaint)
+	if err != nil {
+		return err
 	}
 	painted := filepath.Join(outDir, "in.png")
 	if _, err := ml.RunTool(ctx, pins.IOPaint, "iopaint", []string{"run", "--model=lama", "--device=" + device,

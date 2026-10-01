@@ -12,8 +12,11 @@ import (
 	"embed"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/lockyc/imgkit/internal/engine"
@@ -26,29 +29,30 @@ var scripts embed.FS
 // Timeout covers a first run, which downloads the dependencies and model weights.
 const Timeout = 2 * time.Hour
 
-// Script writes an embedded script and its lockfile into the cache and
-// returns the script's path. The directory is named by a hash of both, so a
-// new imgkit never runs a script an older one left behind.
-func Script(name string) (string, error) {
-	py, err := scripts.ReadFile("scripts/" + name)
-	if err != nil {
-		return "", fmt.Errorf("no embedded script %s", name)
-	}
-	lock, err := scripts.ReadFile("scripts/" + name + ".lock")
-	if err != nil {
-		return "", fmt.Errorf("%s has no lockfile", name)
-	}
+// deviceModule is the device rule's file name, which the torch scripts
+// import from beside them.
+const deviceModule = "imgkit_device.py"
+
+//go:embed imgkit_device.py
+var deviceRule []byte
+
+// cached writes files into a cache directory named by a hash of their names
+// and contents, so a new imgkit never runs a file an older one left behind,
+// and returns the directory.
+func cached(files map[string][]byte) (string, error) {
+	names := slices.Sorted(maps.Keys(files))
 	h := sha256.New()
-	h.Write(py)
-	h.Write(lock)
+	for _, n := range names {
+		fmt.Fprintf(h, "%s\x00%d\x00", n, len(files[n]))
+		h.Write(files[n])
+	}
 	cache, err := engine.CacheDir()
 	if err != nil {
 		return "", err
 	}
 	dir := filepath.Join(cache, "ml", hex.EncodeToString(h.Sum(nil))[:16])
-	path := filepath.Join(dir, name)
-	if _, err := os.Stat(path); err == nil {
-		return path, nil
+	if _, err := os.Stat(dir); err == nil {
+		return dir, nil
 	}
 	if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
 		return "", err
@@ -58,18 +62,53 @@ func Script(name string) (string, error) {
 		return "", err
 	}
 	defer os.RemoveAll(tmp)
-	if err := os.WriteFile(filepath.Join(tmp, name+".lock"), lock, 0o644); err != nil {
-		return "", err
-	}
-	if err := os.WriteFile(filepath.Join(tmp, name), py, 0o644); err != nil {
-		return "", err
-	}
-	if err := os.Rename(tmp, dir); err != nil && !os.IsExist(err) {
-		if _, statErr := os.Stat(path); statErr != nil {
+	for _, n := range names {
+		if err := os.WriteFile(filepath.Join(tmp, n), files[n], 0o644); err != nil {
 			return "", err
 		}
 	}
-	return path, nil
+	if err := os.Rename(tmp, dir); err != nil && !os.IsExist(err) {
+		if _, statErr := os.Stat(dir); statErr != nil {
+			return "", err
+		}
+	}
+	return dir, nil
+}
+
+// Script writes an embedded script, its lockfile and the device rule into
+// the cache and returns the script's path.
+func Script(name string) (string, error) {
+	py, err := scripts.ReadFile("scripts/" + name)
+	if err != nil {
+		return "", fmt.Errorf("no embedded script %s", name)
+	}
+	lock, err := scripts.ReadFile("scripts/" + name + ".lock")
+	if err != nil {
+		return "", fmt.Errorf("%s has no lockfile", name)
+	}
+	dir, err := cached(map[string][]byte{name: py, name + ".lock": lock, deviceModule: deviceRule})
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, name), nil
+}
+
+// ToolDevice is the device a pinned tool's torch model runs on, by the same
+// rule the scripts import, asked of the tool's own torch.
+func ToolDevice(ctx context.Context, t pins.PyTool) (string, error) {
+	dir, err := cached(map[string][]byte{deviceModule: deviceRule})
+	if err != nil {
+		return "", err
+	}
+	res, err := RunTool(ctx, t, "python", []string{filepath.Join(dir, deviceModule)}, nil, nil)
+	if err != nil {
+		return "", err
+	}
+	d := strings.TrimSpace(string(res.Stdout))
+	if d == "" {
+		return "", fmt.Errorf("%s's torch named no device", t.Package)
+	}
+	return d, nil
 }
 
 // RunScript runs an embedded script with uv, locked to its lockfile.

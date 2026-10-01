@@ -23,12 +23,13 @@ func pngOf(t *testing.T, dir, name string, w, h int) string {
 // magick copies its first argument to its last, less a PNG24: prefix, or
 // the image at $ROT for the frame call when ROT is set, playing a source
 // whose EXIF rotation turns it; uv plays iopaint, writing the image into
-// --output under its own name.
+// --output under its own name, and answers the device probe with mps.
 func stubs(t *testing.T) (magick, uv string) {
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	return enginetest.Stub(t, "magick", `for a in "$@"; do last=$a; done
 src=$1; case "$last" in PNG24:*) [ -n "$ROT" ] && src=$ROT;; esac
-cp "$src" "${last#PNG24:}"`), enginetest.Stub(t, "uv", `img=; out=
+cp "$src" "${last#PNG24:}"`), enginetest.Stub(t, "uv", `[ "$7" = python ] && { echo mps; exit 0; }
+img=; out=
 for a in "$@"; do case "$a" in --image=*) img=${a#--image=};; --output=*) out=${a#--output=};; esac; done
 cp "$img" "$out/$(basename "$img")"`)
 }
@@ -60,8 +61,12 @@ func TestInpaint(t *testing.T) {
 	if m[2][len(m[2])-1] != out {
 		t.Errorf("output args %q", m[2])
 	}
-	c := enginetest.Calls(t, log)[0]
-	for _, want := range []string{"--from", "iopaint==1.6.0", "--model=lama", "--device=cpu", "--image=" + frame, "--mask=" + orientedMask} {
+	calls := enginetest.Calls(t, log)
+	if len(calls) != 2 || calls[0][6] != "python" {
+		t.Fatalf("want the device probe, then iopaint: %q", calls)
+	}
+	c := calls[1]
+	for _, want := range []string{"--from", "iopaint==1.6.0", "--model=lama", "--device=mps", "--image=" + frame, "--mask=" + orientedMask} {
 		if !slices.Contains(c, want) {
 			t.Errorf("args lack %s: %q", want, c)
 		}
@@ -83,7 +88,7 @@ func TestInpaintRotatedSource(t *testing.T) {
 	if code := Main(context.Background(), []string{"--mask", mask, in, out}, &o, &e); code != 0 {
 		t.Fatalf("code %d: %s", code, e.String())
 	}
-	if len(enginetest.Calls(t, log)) != 1 {
+	if len(enginetest.Calls(t, log)) != 2 {
 		t.Error("iopaint did not run")
 	}
 }

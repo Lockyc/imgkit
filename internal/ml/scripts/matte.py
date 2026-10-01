@@ -63,6 +63,7 @@ import time
 import cv2
 import numpy as np
 import torch
+from imgkit_device import pick
 from PIL import Image
 from pymatting import estimate_foreground_ml
 from transformers import VitMatteForImageMatting, VitMatteImageProcessor
@@ -110,7 +111,7 @@ def main() -> None:
         sys.exit(f"matte: mask {coarse.shape[::-1]} does not match image {img.size}")
 
     h = img.height
-    device = "mps" if torch.backends.mps.is_available() else "cpu"
+    device = pick()
     processor = VitMatteImageProcessor.from_pretrained(a.model, revision=a.revision)
     model = VitMatteForImageMatting.from_pretrained(a.model, revision=a.revision).to(device).eval()
     t0 = time.time()

@@ -30,6 +30,7 @@ import time
 import numpy as np
 import torch
 from huggingface_hub import hf_hub_download
+from imgkit_device import pick
 from PIL import Image
 from spandrel import ModelLoader
 
@@ -43,12 +44,7 @@ def main() -> None:
         ap.add_argument(k, required=True)
     a = ap.parse_args()
     t0 = time.time()
-    if torch.backends.mps.is_available():
-        device = "mps"
-    elif torch.cuda.is_available():
-        device = "cuda"
-    else:
-        device = "cpu"
+    device = pick()
     loaded = ModelLoader().load_from_file(hf_hub_download(a.model, a.file, revision=a.revision))
     model, scale = loaded.model.to(device).eval(), loaded.scale
     mult = loaded.size_requirements.multiple_of or 1

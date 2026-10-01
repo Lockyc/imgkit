@@ -69,6 +69,12 @@ ahead of the data directory and `PATH`; tests use it to stand in sh stubs.
 Python runs only for the ML steps, where no Go, Rust or shell tool of
 comparable quality exists. `uv` is the only Python tool a user installs.
 
+Every torch model runs on the device `internal/ml/imgkit_device.py` picks,
+which `$IMGKIT_DEVICE` overrides. The scripts import it; for LaMa, imgkit
+runs it under iopaint's torch and passes the answer as iopaint's `--device`
+(cpu, cuda or mps), and iopaint runs LaMa on the CPU when given mps.
+BiRefNet runs on rembg's CPU build.
+
 ## Synthesis policy
 
 `inpaint`, `infill` and `upscale` create pixels the camera or artist never
