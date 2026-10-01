@@ -16,6 +16,15 @@ var pngSig = []byte("\x89PNG\r\n\x1a\n")
 // without touching the pixel data. A render of tens of megapixels is not
 // worth a full decode and re-encode for nine bytes.
 func SetDPI(path string, dpi float64) error {
+	// Validate dpi: must be finite, positive, and round to a valid uint32
+	if math.IsNaN(dpi) || math.IsInf(dpi, 0) || dpi <= 0 {
+		return fmt.Errorf("dpi must be finite and positive, got %v", dpi)
+	}
+	ppm := uint32(math.Round(dpi / 0.0254))
+	if ppm < 1 {
+		return fmt.Errorf("dpi %v rounds to ppm %d, must be >= 1", dpi, ppm)
+	}
+
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -24,22 +33,36 @@ func SetDPI(path string, dpi float64) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", path, err)
 	}
-	ppm := uint32(math.Round(dpi / 0.0254))
+
 	data := make([]byte, 9)
 	binary.BigEndian.PutUint32(data[0:], ppm)
 	binary.BigEndian.PutUint32(data[4:], ppm)
 	data[8] = 1 // unit: metre
+
 	var out bytes.Buffer
 	out.Write(pngSig)
+	foundIHDR := false
 	for _, c := range chunks {
 		if c.typ == "pHYs" {
 			continue
 		}
 		out.Write(c.raw)
 		if c.typ == "IHDR" {
+			foundIHDR = true
 			writeChunk(&out, "pHYs", data)
 		}
 	}
+	if !foundIHDR {
+		return fmt.Errorf("%s: PNG has no IHDR chunk", path)
+	}
+
+	// Get original file permissions
+	fi, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	origMode := fi.Mode().Perm()
+
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".phys-")
 	if err != nil {
 		return err
@@ -50,6 +73,10 @@ func SetDPI(path string, dpi float64) error {
 		return err
 	}
 	if err := tmp.Close(); err != nil {
+		return err
+	}
+	// Restore original permissions before rename
+	if err := os.Chmod(tmp.Name(), origMode); err != nil {
 		return err
 	}
 	return os.Rename(tmp.Name(), path)
