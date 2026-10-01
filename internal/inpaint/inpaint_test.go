@@ -20,11 +20,15 @@ func pngOf(t *testing.T, dir, name string, w, h int) string {
 	return p
 }
 
-// magick copies its first argument to its last; uv plays iopaint, writing
-// the image into --output under its own name.
-func stubs(t *testing.T) string {
-	enginetest.Stub(t, "magick", `for a in "$@"; do last=$a; done; cp "$1" "$last"`)
-	return enginetest.Stub(t, "uv", `img=; out=
+// magick copies its first argument to its last, less a PNG24: prefix, or
+// the image at $ROT for the frame call when ROT is set, playing a source
+// whose EXIF rotation turns it; uv plays iopaint, writing the image into
+// --output under its own name.
+func stubs(t *testing.T) (magick, uv string) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	return enginetest.Stub(t, "magick", `for a in "$@"; do last=$a; done
+src=$1; case "$last" in PNG24:*) [ -n "$ROT" ] && src=$ROT;; esac
+cp "$src" "${last#PNG24:}"`), enginetest.Stub(t, "uv", `img=; out=
 for a in "$@"; do case "$a" in --image=*) img=${a#--image=};; --output=*) out=${a#--output=};; esac; done
 cp "$img" "$out/$(basename "$img")"`)
 }
@@ -32,14 +36,32 @@ cp "$img" "$out/$(basename "$img")"`)
 func TestInpaint(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	log := stubs(t)
+	magick, log := stubs(t)
 	in, mask, out := pngOf(t, dir, "in.png", 40, 30), pngOf(t, dir, "m.png", 40, 30), filepath.Join(dir, "out.png")
 	var o, e bytes.Buffer
 	if code := Main(context.Background(), []string{"--mask", mask, in, out}, &o, &e); code != 0 {
 		t.Fatalf("code %d: %s", code, e.String())
 	}
+	m := enginetest.Calls(t, magick)
+	if len(m) != 3 {
+		t.Fatalf("%d magick calls, want frame, mask, output: %q", len(m), m)
+	}
+	// The image is the opaque normalised frame; the mask is only oriented,
+	// so it lines up with the displayed image and keeps its values.
+	frame := strings.TrimPrefix(m[0][len(m[0])-1], "PNG24:")
+	idx := func(s string) int { return slices.Index(m[0], s) }
+	if m[0][0] != in || !(0 < idx("-auto-orient") && idx("-auto-orient") < idx("-profile") && idx("-profile") < idx("-strip") && idx("-strip") < idx("off")) || !strings.HasPrefix(m[0][len(m[0])-1], "PNG24:") {
+		t.Errorf("frame args %q", m[0])
+	}
+	orientedMask := m[1][2]
+	if !slices.Equal(m[1], []string{mask, "-auto-orient", orientedMask}) || orientedMask == mask {
+		t.Errorf("mask args %q", m[1])
+	}
+	if m[2][len(m[2])-1] != out {
+		t.Errorf("output args %q", m[2])
+	}
 	c := enginetest.Calls(t, log)[0]
-	for _, want := range []string{"--from", "iopaint==1.6.0", "--model=lama", "--device=cpu", "--mask=" + mask} {
+	for _, want := range []string{"--from", "iopaint==1.6.0", "--model=lama", "--device=cpu", "--image=" + frame, "--mask=" + orientedMask} {
 		if !slices.Contains(c, want) {
 			t.Errorf("args lack %s: %q", want, c)
 		}
@@ -49,10 +71,27 @@ func TestInpaint(t *testing.T) {
 	}
 }
 
+// TestInpaintRotatedSource: a mask drawn on the displayed image of a phone
+// JPEG stored on its side lines up with the oriented frame.
+func TestInpaintRotatedSource(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	_, log := stubs(t)
+	t.Setenv("ROT", pngOf(t, dir, "rot.png", 30, 40))
+	in, mask, out := pngOf(t, dir, "in.png", 40, 30), pngOf(t, dir, "m.png", 30, 40), filepath.Join(dir, "out.png")
+	var o, e bytes.Buffer
+	if code := Main(context.Background(), []string{"--mask", mask, in, out}, &o, &e); code != 0 {
+		t.Fatalf("code %d: %s", code, e.String())
+	}
+	if len(enginetest.Calls(t, log)) != 1 {
+		t.Error("iopaint did not run")
+	}
+}
+
 func TestInpaintRefuses(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	log := stubs(t)
+	_, log := stubs(t)
 	in, out := pngOf(t, dir, "in.png", 40, 30), filepath.Join(dir, "out.png")
 	var o, e bytes.Buffer
 	if code := Main(context.Background(), []string{"--mask", pngOf(t, dir, "m.png", 20, 15), in, out}, &o, &e); code != 1 || !strings.Contains(e.String(), "40x30") {
@@ -71,7 +110,7 @@ func TestInpaintRefuses(t *testing.T) {
 func TestInpaintRefusesSameFile(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	log := stubs(t)
+	magick, log := stubs(t)
 	in, mask := pngOf(t, dir, "in.png", 40, 30), pngOf(t, dir, "m.png", 40, 30)
 	before, _ := os.ReadFile(in)
 	mbefore, _ := os.ReadFile(mask)
@@ -90,7 +129,7 @@ func TestInpaintRefusesSameFile(t *testing.T) {
 	if after, _ := os.ReadFile(mask); !bytes.Equal(mbefore, after) {
 		t.Error("mask changed")
 	}
-	if len(enginetest.Calls(t, log)) != 0 {
+	if len(enginetest.Calls(t, magick))+len(enginetest.Calls(t, log)) != 0 {
 		t.Error("an engine ran")
 	}
 }

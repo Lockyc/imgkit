@@ -14,6 +14,7 @@ import (
 
 	"github.com/lockyc/imgkit/internal/cli"
 	"github.com/lockyc/imgkit/internal/engine"
+	"github.com/lockyc/imgkit/internal/frame"
 	"github.com/lockyc/imgkit/internal/imgsize"
 	"github.com/lockyc/imgkit/internal/ml"
 	"github.com/lockyc/imgkit/internal/pins"
@@ -56,33 +57,38 @@ func run(ctx context.Context, in, mask, out, device string) error {
 	if engine.SameFile(in, out) || engine.SameFile(mask, out) {
 		return fmt.Errorf("%s is also an input; write the result elsewhere", out)
 	}
-	iw, ih, err := imgsize.Dims(in)
-	if err != nil {
-		return err
-	}
-	mw, mh, err := imgsize.Dims(mask)
-	if err != nil {
-		return err
-	}
-	if iw != mw || ih != mh {
-		return fmt.Errorf("the mask is %dx%d and the image %dx%d; iopaint would resize the mask silently", mw, mh, iw, ih)
-	}
 	tmp, err := os.MkdirTemp("", "imgkit-inpaint-")
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(tmp)
-	// A PNG copy under a fixed name, so iopaint's output name is known.
-	src, outDir := filepath.Join(tmp, "in.png"), filepath.Join(tmp, "out")
+	// LaMa reads the normalised frame under a fixed name, so iopaint's
+	// output name is known, and the mask oriented the same way, so a mask
+	// drawn on the displayed image lines up.
+	src, m, outDir := filepath.Join(tmp, "in.png"), filepath.Join(tmp, "mask.png"), filepath.Join(tmp, "out")
 	if err := os.Mkdir(outDir, 0o755); err != nil {
 		return err
 	}
-	if _, err := engine.Run(ctx, engine.Cmd{Engine: "magick", Args: []string{in, src}, Inputs: []string{in}, Outputs: []string{src}}); err != nil {
+	if err := frame.Write(ctx, in, src, frame.Options{Opaque: true}); err != nil {
 		return err
+	}
+	if err := frame.Orient(ctx, mask, m); err != nil {
+		return err
+	}
+	iw, ih, err := imgsize.Dims(src)
+	if err != nil {
+		return err
+	}
+	mw, mh, err := imgsize.Dims(m)
+	if err != nil {
+		return err
+	}
+	if iw != mw || ih != mh {
+		return fmt.Errorf("the mask is %dx%d and the image %dx%d as displayed; iopaint would resize the mask silently", mw, mh, iw, ih)
 	}
 	painted := filepath.Join(outDir, "in.png")
 	if _, err := ml.RunTool(ctx, pins.IOPaint, "iopaint", []string{"run", "--model=lama", "--device=" + device,
-		"--image=" + src, "--mask=" + mask, "--output=" + outDir}, []string{src, mask}, []string{painted}); err != nil {
+		"--image=" + src, "--mask=" + m, "--output=" + outDir}, []string{src, m}, []string{painted}); err != nil {
 		return err
 	}
 	_, err = engine.Run(ctx, engine.Cmd{Engine: "magick", Args: []string{painted, out}, Inputs: []string{painted}, Outputs: []string{out}})

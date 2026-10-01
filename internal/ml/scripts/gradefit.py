@@ -55,6 +55,12 @@ def main() -> None:
     ref = np.asarray(Image.open(a.ref).convert("RGB"))
     if a.ref_crop:
         x, y, w, h = a.ref_crop
+        H, W = ref.shape[:2]
+        if w < 1 or h < 1:
+            sys.exit(f"gradefit: --ref-crop {x},{y},{w},{h} is empty")
+        past = [f"{edge} edge ({end} > {size} px)" for edge, end, size in (("right", x + w, W), ("bottom", y + h, H)) if end > size]
+        if past:
+            sys.exit(f"gradefit: --ref-crop {x},{y},{w},{h} runs past the {W}x{H} reference's " + " and ".join(past))
         ref = ref[y : y + h, x : x + w]
     h, w = ref.shape[:2]
 

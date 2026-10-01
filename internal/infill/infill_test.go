@@ -62,6 +62,13 @@ func TestInfill(t *testing.T) {
 				t.Fatalf("code %d: %s", code, e.String())
 			}
 			calls := enginetest.Calls(t, log)
+			// The image and mask are oriented as displayed, nothing else,
+			// and the holes are cut from those copies.
+			if len(calls) < 3 || !slices.Equal(calls[0][:2], []string{in, "-auto-orient"}) || !slices.Equal(calls[1][:2], []string{mask, "-auto-orient"}) ||
+				calls[2][0] != calls[0][2] || calls[2][2] != calls[1][2] {
+				t.Fatalf("want the image and mask oriented, then the holes cut from them: %q", calls)
+			}
+			calls = calls[2:]
 			blurSrc := "holes.png"
 			if c.band { // holes, edge stops, 2 blurs, fill, composite
 				if len(calls) != 6 || filepath.Base(calls[1][len(calls[1])-1]) != "reached.png" {
@@ -94,14 +101,40 @@ func TestInfill(t *testing.T) {
 	}
 }
 
+// orientStub plays magick: an -auto-orient call copies its input, or the
+// image at $ROT for in.png when ROT is set, playing a source whose EXIF
+// rotation turns it; any other call fails with status 3.
+const orientStub = `for a in "$@"; do last=$a; done
+[ "$2" = -auto-orient ] || exit 3
+src=$1; [ -n "$ROT" ] && [ "$(basename "$1")" = in.png ] && src=$ROT
+cp "$src" "$last"`
+
+// TestInfillRotatedSource: a mask drawn on the displayed image of a phone
+// JPEG stored on its side passes the size check.
+func TestInfillRotatedSource(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	t.Setenv("ROT", pngOf(t, dir, "rot.png", 30, 40))
+	log := enginetest.Stub(t, "magick", orientStub)
+	in, mask := pngOf(t, dir, "in.png", 40, 30), pngOf(t, dir, "m.png", 30, 40)
+	var o, e bytes.Buffer
+	Main(context.Background(), []string{"--mask", mask, in, filepath.Join(dir, "out.png")}, &o, &e)
+	if strings.Contains(e.String(), "the mask is") || len(enginetest.Calls(t, log)) != 3 {
+		t.Errorf("rotated source refused before the holes: %q", e.String())
+	}
+}
+
 func TestInfillRefuses(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
-	log := enginetest.Stub(t, "magick", `exit 0`)
+	log := enginetest.Stub(t, "magick", orientStub)
 	in, out := pngOf(t, dir, "in.png", 40, 30), filepath.Join(dir, "out.png")
 	var o, e bytes.Buffer
-	if code := Main(context.Background(), []string{"--mask", pngOf(t, dir, "m.png", 41, 30), in, out}, &o, &e); code != 1 {
-		t.Errorf("mismatched mask: code %d", code)
+	if code := Main(context.Background(), []string{"--mask", pngOf(t, dir, "m.png", 41, 30), in, out}, &o, &e); code != 1 || !strings.Contains(e.String(), "41x30") {
+		t.Errorf("mismatched mask: code %d, %q", code, e.String())
+	}
+	if n := len(enginetest.Calls(t, log)); n != 2 {
+		t.Errorf("%d magick calls for a mismatched mask, want the two orients", n)
 	}
 	if code := Main(context.Background(), []string{"--mask", pngOf(t, dir, "m2.png", 40, 30), "--levels", "6,20", in, out}, &o, &e); code != 2 {
 		t.Errorf("ascending levels: code %d", code)
@@ -111,8 +144,8 @@ func TestInfillRefuses(t *testing.T) {
 	if code := Main(context.Background(), []string{"--mask", pngOf(t, dir, "m3.png", 40, 30), in, out}, &o, &e); code != 1 || !strings.Contains(e.String(), "forbid") {
 		t.Errorf("forbidden: code %d, %q", code, e.String())
 	}
-	if len(enginetest.Calls(t, log)) != 0 {
-		t.Error("magick ran for a refused infill")
+	if n := len(enginetest.Calls(t, log)); n != 2 {
+		t.Errorf("magick ran %d times for refused infills, want only the mismatched mask's two orients", n)
 	}
 }
 

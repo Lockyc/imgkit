@@ -18,11 +18,12 @@ import (
 
 	"github.com/lockyc/imgkit/internal/cli"
 	"github.com/lockyc/imgkit/internal/engine"
+	"github.com/lockyc/imgkit/internal/frame"
 	"github.com/lockyc/imgkit/internal/imgsize"
 	"github.com/lockyc/imgkit/internal/policy"
 )
 
-const usage = "infill --mask mask.png [--levels 150,60,20,6] [--grain 1] [--seed 1] <in> <out.png>"
+const usage = "infill --mask mask.png [--levels 150,60,20,6] [--grain 1] [--seed 1] <in> <out.png>\n\nThe output keeps the input's bit depth and colour profile, turned upright by its EXIF rotation."
 
 // Main runs `imgkit infill`.
 func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
@@ -69,28 +70,38 @@ func run(ctx context.Context, in, mask, out string, radii []int, grain float64, 
 	if engine.SameFile(in, out) || engine.SameFile(mask, out) {
 		return fmt.Errorf("%s is also an input; write the result elsewhere", out)
 	}
-	iw, ih, err := imgsize.Dims(in)
-	if err != nil {
-		return err
-	}
-	mw, mh, err := imgsize.Dims(mask)
-	if err != nil {
-		return err
-	}
-	if iw != mw || ih != mh {
-		return fmt.Errorf("the mask is %dx%d and the image %dx%d", mw, mh, iw, ih)
-	}
 	tmp, err := os.MkdirTemp("", "imgkit-infill-")
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(tmp)
+	// Oriented as displayed, so a mask drawn on the displayed image lines
+	// up, and otherwise as stored: the result keeps the source's bit depth
+	// and profile.
+	img, m := filepath.Join(tmp, "in.png"), filepath.Join(tmp, "mask.png")
+	if err := frame.Orient(ctx, in, img); err != nil {
+		return err
+	}
+	if err := frame.Orient(ctx, mask, m); err != nil {
+		return err
+	}
+	iw, ih, err := imgsize.Dims(img)
+	if err != nil {
+		return err
+	}
+	mw, mh, err := imgsize.Dims(m)
+	if err != nil {
+		return err
+	}
+	if iw != mw || ih != mh {
+		return fmt.Errorf("the mask is %dx%d and the image %dx%d as displayed", mw, mh, iw, ih)
+	}
 	magick := func(inputs []string, args ...string) error {
 		_, err := engine.Run(ctx, engine.Cmd{Engine: "magick", Args: args, Inputs: inputs, Outputs: []string{args[len(args)-1]}})
 		return err
 	}
 	holes := filepath.Join(tmp, "holes.png")
-	if err := magick([]string{in, mask}, in, "(", mask, "-negate", ")", "-alpha", "off", "-compose", "CopyOpacity", "-composite", holes); err != nil {
+	if err := magick([]string{img, m}, img, "(", m, "-negate", ")", "-alpha", "off", "-compose", "CopyOpacity", "-composite", holes); err != nil {
 		return err
 	}
 	// The levels see only the ground each hole reaches without crossing a

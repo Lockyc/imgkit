@@ -35,3 +35,17 @@ func TestWrite(t *testing.T) {
 		t.Errorf("call %q", c)
 	}
 }
+
+func TestOrient(t *testing.T) {
+	if got, want := OrientArgs("in.jpg", "o.png"), []string{"in.jpg", "-auto-orient", "o.png"}; !slices.Equal(got, want) {
+		t.Errorf("args %q, want %q", got, want)
+	}
+	log := enginetest.Stub(t, "magick", `for a in "$@"; do last=$a; done; printf png > "$last"`)
+	out := t.TempDir() + "/o.png"
+	if err := Orient(context.Background(), "in.jpg", out); err != nil {
+		t.Fatal(err)
+	}
+	if c := enginetest.Calls(t, log)[0]; !slices.Equal(c, []string{"in.jpg", "-auto-orient", out}) {
+		t.Errorf("call %q", c)
+	}
+}

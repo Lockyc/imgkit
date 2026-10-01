@@ -4,10 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 
 	"github.com/lockyc/imgkit/internal/cli"
+	"github.com/lockyc/imgkit/internal/engine"
+	"github.com/lockyc/imgkit/internal/frame"
 	"github.com/lockyc/imgkit/internal/ml"
 )
 
@@ -40,18 +44,46 @@ func fitMain(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "imgkit grade fit: give --ref, at most one --ref-crop, and a --level of 2-16")
 		return 2
 	}
-	a := []string{"--subject", rest[0], "--ref", *ref, "--out", rest[1],
-		"--level", strconv.Itoa(*level), "--min-inliers", strconv.Itoa(*minInliers)}
+	var extra []string
 	if len(crop) == 1 {
-		a = append(a, "--ref-crop", crop[0])
+		extra = append(extra, "--ref-crop", crop[0])
 	}
 	for _, e := range exclude {
-		a = append(a, "--exclude", e)
+		extra = append(extra, "--exclude", e)
 	}
-	res, err := ml.RunScript(ctx, "gradefit.py", a, []string{rest[0], *ref}, []string{rest[1]})
+	extra = append(extra, "--level", strconv.Itoa(*level), "--min-inliers", strconv.Itoa(*minInliers))
+	res, err := fit(ctx, rest[0], *ref, rest[1], extra)
 	if err != nil {
 		return cli.Fail(stderr, "grade fit", err)
 	}
-	stdout.Write(res.Stdout)
+	stdout.Write(res)
 	return 0
+}
+
+// fit fits on the subject's and reference's normalised frames, so
+// --ref-crop is in the reference's displayed orientation and the lookup maps
+// sRGB to sRGB rather than across two gamuts. The subject keeps its alpha,
+// which marks the pixels the fit may use.
+func fit(ctx context.Context, subject, ref, out string, extra []string) ([]byte, error) {
+	// The script reads temporary frames, so no engine call names both an
+	// input and <out>; this is the one place that can refuse them being
+	// the same before any work.
+	if engine.SameFile(subject, out) || engine.SameFile(ref, out) {
+		return nil, fmt.Errorf("%s is also an input; write the result elsewhere", out)
+	}
+	tmp, err := os.MkdirTemp("", "imgkit-gradefit-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tmp)
+	s, r := filepath.Join(tmp, "subject.png"), filepath.Join(tmp, "ref.png")
+	if err := frame.Write(ctx, subject, s, frame.Options{}); err != nil {
+		return nil, err
+	}
+	if err := frame.Write(ctx, ref, r, frame.Options{Opaque: true}); err != nil {
+		return nil, err
+	}
+	a := append([]string{"--subject", s, "--ref", r, "--out", out}, extra...)
+	res, err := ml.RunScript(ctx, "gradefit.py", a, []string{s, r}, []string{out})
+	return res.Stdout, err
 }
