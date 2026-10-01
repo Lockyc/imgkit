@@ -40,14 +40,12 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	for _, s := range strings.Split(*levels, ",") {
 		r, err := strconv.Atoi(strings.TrimSpace(s))
 		if err != nil || r <= 0 || (len(radii) > 0 && r >= radii[len(radii)-1]) {
-			fmt.Fprintln(stderr, "imgkit infill: --levels must be positive radii, strictly coarse to fine")
-			return 2
+			return cli.Usage(stderr, "infill", "--levels must be positive radii, strictly coarse to fine")
 		}
 		radii = append(radii, r)
 	}
 	if *mask == "" || strings.ToLower(filepath.Ext(rest[1])) != ".png" || *grain < 0 {
-		fmt.Fprintln(stderr, "imgkit infill: give --mask, a --grain of 0 or more, and an output ending .png")
-		return 2
+		return cli.Usage(stderr, "infill", "give --mask, a --grain of 0 or more, and an output ending .png")
 	}
 	if err := run(ctx, rest[0], *mask, rest[1], radii, *grain, *seed); err != nil {
 		return cli.Fail(stderr, "infill", err)

@@ -117,10 +117,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if !ok {
 		return code
 	}
-	usageErr := func(format string, a ...any) int {
-		fmt.Fprintf(stderr, "imgkit cutout: "+format+"\n", a...)
-		return 2
-	}
+	usageErr := func(format string, a ...any) int { return cli.Usage(stderr, "cutout", format, a...) }
 	j := job{in: rest[0], out: rest[1], coarse: *coarse, height: *height, tile: *tile, bin: *bin, bout: *bout}
 	if strings.ToLower(filepath.Ext(j.out)) != ".png" {
 		return usageErr("the output must be .png: lossy alpha damages the matte edge")

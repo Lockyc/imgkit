@@ -45,8 +45,7 @@ func applyMain(ctx context.Context, args []string, stdout, stderr io.Writer) int
 		return code
 	}
 	if *clut == "" || strings.ToLower(filepath.Ext(rest[1])) != ".png" {
-		fmt.Fprintln(stderr, "imgkit grade apply: give --clut, and an output ending .png")
-		return 2
+		return cli.Usage(stderr, "grade apply", "give --clut, and an output ending .png")
 	}
 	if err := apply(ctx, rest[0], *clut, rest[1]); err != nil {
 		return cli.Fail(stderr, "grade apply", err)

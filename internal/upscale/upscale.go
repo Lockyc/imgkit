@@ -32,8 +32,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	if strings.ToLower(filepath.Ext(rest[1])) != ".png" {
-		fmt.Fprintln(stderr, "imgkit upscale: the output must end .png")
-		return 2
+		return cli.Usage(stderr, "upscale", "the output must end .png")
 	}
 	if err := run(ctx, rest[0], rest[1]); err != nil {
 		return cli.Fail(stderr, "upscale", err)

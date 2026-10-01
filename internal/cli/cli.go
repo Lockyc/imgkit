@@ -37,6 +37,12 @@ func Parse(fs *flag.FlagSet, args []string, positional int) (rest []string, code
 	return fs.Args(), 0, true
 }
 
+// Usage reports a usage error for op and returns exit status 2.
+func Usage(stderr io.Writer, op, format string, a ...any) int {
+	fmt.Fprintf(stderr, "imgkit %s: %s\n", op, fmt.Sprintf(format, a...))
+	return 2
+}
+
 // Fail reports err for op and returns exit status 1.
 func Fail(stderr io.Writer, op string, err error) int {
 	fmt.Fprintf(stderr, "imgkit %s: %v\n", op, err)

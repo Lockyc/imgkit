@@ -44,7 +44,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if !ok {
 		return code
 	}
-	usageErr := func(format string, a ...any) int { fmt.Fprintf(stderr, "imgkit qr: "+format+"\n", a...); return 2 }
+	usageErr := func(format string, a ...any) int { return cli.Usage(stderr, "qr", format, a...) }
 	if *out == "" {
 		return usageErr("-o is required")
 	}

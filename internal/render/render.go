@@ -76,9 +76,8 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	}
 	j := job{png: *pngOut, pdf: *pdfOut, scale: *scale, budget: *budget, failIf: failIf, warn: stderr}
 	usageErr := func(msg string) int {
-		fmt.Fprintf(stderr, "imgkit render: %s\n", msg)
-		fs.Usage()
-		return 2
+		defer fs.Usage()
+		return cli.Usage(stderr, "render", "%s", msg)
 	}
 	if j.png == "" && j.pdf == "" {
 		return usageErr("give --png, --pdf or both")

@@ -32,8 +32,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	if *mask == "" || strings.ToLower(filepath.Ext(rest[1])) != ".png" {
-		fmt.Fprintln(stderr, "imgkit inpaint: give --mask and an output ending .png")
-		return 2
+		return cli.Usage(stderr, "inpaint", "give --mask and an output ending .png")
 	}
 	if err := run(ctx, rest[0], *mask, rest[1]); err != nil {
 		return cli.Fail(stderr, "inpaint", err)

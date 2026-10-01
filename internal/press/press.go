@@ -75,25 +75,22 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	if *icc == "" {
-		fmt.Fprintln(stderr, "imgkit press: --icc is required")
-		fs.Usage()
-		return 2
+		defer fs.Usage()
+		return cli.Usage(stderr, "press", "--icc is required")
 	}
 	for _, c := range []struct {
 		flag string
 		ok   bool
 	}{{"max-ppi", *maxPPI > 0}, {"max-rmse", *maxRMSE > 0}, {"proof-width", *proofWidth > 0}} {
 		if !c.ok {
-			fmt.Fprintf(stderr, "imgkit press: --%s must be greater than 0\n", c.flag)
-			return 2
+			return cli.Usage(stderr, "press", "--%s must be greater than 0", c.flag)
 		}
 	}
 	j := job{maxPPI: *maxPPI, maxRMSE: *maxRMSE, proofWidth: *proofWidth, log: stdout}
 	for _, s := range specs {
 		r, err := parseRegion(s)
 		if err != nil {
-			fmt.Fprintf(stderr, "imgkit press: %v\n", err)
-			return 2
+			return cli.Usage(stderr, "press", "%v", err)
 		}
 		j.regions = append(j.regions, r)
 	}

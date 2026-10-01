@@ -68,7 +68,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if !ok {
 		return code
 	}
-	usageErr := func(err error) int { fmt.Fprintf(stderr, "imgkit fonts: %v\n", err); return 2 }
+	usageErr := func(err error) int { return cli.Usage(stderr, "fonts", "%v", err) }
 	if *out == "" || len(rest) == 0 {
 		return usageErr(fmt.Errorf("give -o and at least one FILE:FAMILY:WEIGHT:STYLE"))
 	}

@@ -41,8 +41,7 @@ func fitMain(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	if *ref == "" || len(crop) > 1 || *level < 2 || *level > 16 {
-		fmt.Fprintln(stderr, "imgkit grade fit: give --ref, at most one --ref-crop, and a --level of 2-16")
-		return 2
+		return cli.Usage(stderr, "grade fit", "give --ref, at most one --ref-crop, and a --level of 2-16")
 	}
 	var extra []string
 	if len(crop) == 1 {
