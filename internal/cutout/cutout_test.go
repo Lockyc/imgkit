@@ -18,10 +18,10 @@ import (
 )
 
 // magick: `-format %wx%h info:` prints $SRC_DIMS; any other call copies
-// $FIXTURE_FRAME to its last argument.
+// $FIXTURE_FRAME to its last argument, less a PNG24:/PNG32: prefix.
 const magickStub = `case "$*" in
   *info:*) printf '%s' "${SRC_DIMS:-800x1200}" ;;
-  *) for a in "$@"; do last=$a; done; cp "$FIXTURE_FRAME" "$last" ;;
+  *) for a in "$@"; do last=$a; done; last=${last#PNG24:}; cp "$FIXTURE_FRAME" "${last#PNG32:}" ;;
 esac`
 
 // uv: birefnet.py copies $FIXTURE_MASK to its 2nd argument; matte.py writes

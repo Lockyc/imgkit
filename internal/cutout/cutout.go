@@ -22,7 +22,7 @@ import (
 
 	"github.com/lockyc/imgkit/internal/cli"
 	"github.com/lockyc/imgkit/internal/engine"
-	"github.com/lockyc/imgkit/internal/icc"
+	imgframe "github.com/lockyc/imgkit/internal/frame"
 	"github.com/lockyc/imgkit/internal/ml"
 	"github.com/lockyc/imgkit/internal/pins"
 	"github.com/lockyc/imgkit/internal/raster"
@@ -194,20 +194,13 @@ func (j job) run(ctx context.Context) (int, int, error) {
 		return 0, 0, fmt.Errorf("--height %d would upsample the %d px source; a cut-out is never upsampled", h, sh)
 	}
 	cw, ch := contextSize(int(math.Round(float64(sw)*float64(h)/float64(sh))), h)
-	srgb, err := icc.SRGB()
-	if err != nil {
-		return 0, 0, err
-	}
 	tmp, err := os.MkdirTemp("", "imgkit-cutout-")
 	if err != nil {
 		return 0, 0, err
 	}
 	defer os.RemoveAll(tmp)
 	frame, mask := filepath.Join(tmp, "frame.png"), filepath.Join(tmp, "coarse.png")
-	// Orient, then convert to sRGB, then strip: stripping first loses the
-	// rotation and leaves a wide-gamut photo plausibly duller.
-	frameArgs := []string{j.in, "-auto-orient", "-profile", srgb, "-strip", "-resize", "x" + strconv.Itoa(h), "-alpha", "off", "-depth", "8", frame}
-	if _, err := engine.Run(ctx, engine.Cmd{Engine: "magick", Args: frameArgs, Inputs: []string{j.in}, Outputs: []string{frame}}); err != nil {
+	if err := imgframe.Write(ctx, j.in, frame, imgframe.Options{Height: h, Opaque: true}); err != nil {
 		return 0, 0, err
 	}
 	if err := j.coarseMask(ctx, frame, mask, tmp); err != nil {
