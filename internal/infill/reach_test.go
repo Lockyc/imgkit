@@ -2,6 +2,7 @@ package infill
 
 import (
 	"image/color"
+	"math"
 	"path/filepath"
 	"testing"
 
@@ -12,7 +13,7 @@ import (
 // frame-sized lookup.
 func dropped(t *testing.T, holes string, w, h int) func(x, y int) bool {
 	t.Helper()
-	pieces, err := edgeStops(holes, t.TempDir(), 3, 450)
+	pieces, err := edgeStops(holes, t.TempDir(), 3, 150)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +93,7 @@ func TestEdgeStopsKeepBothSidesOfAStraddledEdge(t *testing.T) {
 
 func TestEdgeStopsNoneOnOneGround(t *testing.T) {
 	holes, _ := ground(t, t.TempDir(), 300, 300, func(x, y int) (int, int) { return 128, 0 }, disc(150, 150, 30))
-	pieces, err := edgeStops(holes, t.TempDir(), 3, 450)
+	pieces, err := edgeStops(holes, t.TempDir(), 3, 150)
 	if err != nil || pieces != nil {
 		t.Errorf("pieces %v, err %v; want none on a flat ground", pieces, err)
 	}
@@ -131,7 +132,7 @@ func TestEdgeStopsNoneOnGrainyGrounds(t *testing.T) {
 		cx, cy int
 	}{{"flat-ground.jpg", 760, 760}, {"paper-ground.jpg", 800, 800}} {
 		holes := holed(t, filepath.Join("..", "..", "quality", "assets", c.asset), c.cx, c.cy, 150)
-		pieces, err := edgeStops(holes, t.TempDir(), 3, 450)
+		pieces, err := edgeStops(holes, t.TempDir(), 3, 150)
 		if err != nil || pieces != nil {
 			t.Errorf("%s: pieces %v, err %v; want none with no edge", c.asset, pieces, err)
 		}
@@ -148,7 +149,7 @@ func TestEdgeStopsKeepTheSameGroundBeyondALine(t *testing.T) {
 		}
 		return 160, 20
 	}, disc(200, 160, 40))
-	pieces, err := edgeStops(holes, t.TempDir(), 3, 450)
+	pieces, err := edgeStops(holes, t.TempDir(), 3, 150)
 	if err != nil || pieces != nil {
 		t.Errorf("pieces %v, err %v; want none beyond a line in one ground", pieces, err)
 	}
@@ -191,8 +192,79 @@ func TestEdgeStopsIgnoreAStraySpeck(t *testing.T) {
 	if err := raster.SavePNG(holes, src); err != nil {
 		t.Fatal(err)
 	}
-	pieces, err := edgeStops(holes, t.TempDir(), 3, 450)
+	pieces, err := edgeStops(holes, t.TempDir(), 3, 150)
 	if err != nil || pieces != nil {
 		t.Errorf("pieces %v, err %v; want none with no edge", pieces, err)
+	}
+}
+
+// A rail is judged by what it would draw into the hole, not by how much of
+// the crop it fills: specks down a tall frame, which stretch the crop to
+// six times the bare hole's, leave the rail cut off. (The crop reaches 450
+// px either side of the hole, so the rail is judged within that.)
+func TestEdgeStopsJudgeARailTheSameWhateverTheCrop(t *testing.T) {
+	const w, h, top, bottom = 1000, 4000, 230, 270
+	at := func(x, y int) (int, int) {
+		if y >= top && y < bottom {
+			return 30, 10
+		}
+		return 160, 20
+	}
+	in := disc(500, 160, 40)
+	specks := func(x, y int) bool { return in(x, y) || (x == 500 && y >= 900 && (y-900)%800 == 0) }
+	for name, hole := range map[string]func(x, y int) bool{"bare": in, "specks": specks} {
+		holes, _ := ground(t, t.TempDir(), w, h, at, hole)
+		cut := dropped(t, holes, w, h)
+		if f := frac(w, h, cut, func(x, y int) bool { return x >= 100 && x < 900 && y >= top+5 && y < bottom-5 }); f < 0.99 {
+			t.Errorf("%s: %.3f of the rail is cut off, want all of it", name, f)
+		}
+		if f := frac(w, h, cut, func(x, y int) bool { return (y < top-5 || y >= bottom+5) && !hole(x, y) }); f > 0.01 {
+			t.Errorf("%s: %.3f of the ground is cut off, want under 0.01", name, f)
+		}
+	}
+}
+
+// A dark block below a hole in a 1000 x 1000 frame is cut off when the
+// coarsest level would draw at least a level of its tone into the hole:
+// small and near, or just over that; not just under it, and not a larger
+// one far off. Its pull, in levels of tone, is noted on each.
+func TestEdgeStopsCutOffABlockByItsPullOnTheHole(t *testing.T) {
+	const hy, hr = 300, 40
+	for _, c := range []struct {
+		name      string
+		wide, gap int // the block's side (or width, for the slab) and its gap below the hole
+		tall      int
+		cut       bool
+	}{
+		{"small and near (1.5)", 60, 30, 60, true},
+		{"just over (1.14)", 54, 30, 54, true},
+		{"just under (0.81)", 48, 30, 48, false},
+		{"larger and far (0.43)", 300, 350, 100, false},
+	} {
+		top := hy + hr + c.gap
+		block := func(x, y int) bool {
+			return y >= top && y < top+c.tall && x >= 500-c.wide/2 && x < 500-c.wide/2+c.wide
+		}
+		in := disc(500, hy, hr)
+		holes, _ := ground(t, t.TempDir(), 1000, 1000, func(x, y int) (int, int) {
+			if block(x, y) {
+				return 30, 10
+			}
+			return 160, 20
+		}, in)
+		cut := dropped(t, holes, 1000, 1000)
+		inner := func(x, y int) bool {
+			return y >= top+10 && y < top+c.tall-10 && x >= 510-c.wide/2 && x < 490+c.wide-c.wide/2
+		}
+		want := 0.0
+		if c.cut {
+			want = 1
+		}
+		if f := frac(1000, 1000, cut, inner); math.Abs(f-want) > 0.01 {
+			t.Errorf("%s: %.3f of the block is cut off, want %.0f", c.name, f, want)
+		}
+		if f := frac(1000, 1000, cut, func(x, y int) bool { return !in(x, y) && !block(x, y) && (y < top-10 || y >= top+c.tall+10) }); f > 0.001 {
+			t.Errorf("%s: %.4f of the ground is cut off, want none", c.name, f)
+		}
 	}
 }

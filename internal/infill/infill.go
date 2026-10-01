@@ -94,9 +94,10 @@ func run(ctx context.Context, in, mask, out string, radii []int, grain float64, 
 		return err
 	}
 	// The levels see only the ground each hole reaches without crossing a
-	// strong edge; the finest level sets how lightly that edge test blurs.
+	// strong edge; the finest level sets how lightly that edge test blurs,
+	// and the coarsest how hard a ground across an edge pulls on a hole.
 	src := holes
-	stops, err := edgeStops(holes, tmp, float64(radii[len(radii)-1])/2, 3*radii[0])
+	stops, err := edgeStops(holes, tmp, float64(radii[len(radii)-1])/2, float64(radii[0]))
 	if err != nil {
 		return err
 	}

@@ -18,13 +18,15 @@ import (
 // median gradient in a ring around the hole. Each connected part of the
 // ground the flood misses (pixels at or below the limit) is cut off from the
 // blur levels only if it is another ground: its median tone is more than
-// stopK robust std-devs from the ring's, and that difference times its share
-// of the crop's known pixels (its weight in a blur spanning the crop) is at
-// least one 8-bit level, so it would visibly shift the fill. The edge pixels
-// joined to a cut-off part go with it. So a rail with the hole's own ground
-// beyond it is cut off and that ground is kept; specks, fibres and the
-// pockets they enclose stay. A hole that straddles an edge touches both
-// grounds, so it keeps both.
+// stopK robust std-devs from the ring's, and that difference times its pull
+// on the holes (the most the coarsest level draws from it at any hole
+// pixel, as a share of all it draws there) is at least one 8-bit level, so
+// it would visibly shift the fill. The pull falls with distance from the
+// holes, not with how far the crop around them runs. The edge pixels joined
+// to a cut-off part go with it. So a rail with the hole's own ground beyond
+// it is cut off and that ground is kept; specks, fibres and the pockets they
+// enclose stay. A hole that straddles an edge touches both grounds, so it
+// keeps both.
 const (
 	stopK = 4.0 // gradient threshold, in robust std-devs above the ring's median
 	// Less than one 8-bit level (of gradient per pixel, or of tone) never
@@ -36,8 +38,10 @@ const (
 // edgeStops reads holes and returns pieces, black over the known pixels of
 // another ground cut off by a strong edge from the holes they could feed,
 // transparent elsewhere; nil when there are none. smooth is the blur before
-// the gradient, and reach how far the coarsest level reaches from a hole.
-func edgeStops(holesPath, dir string, smooth float64, reach int) ([]piece, error) {
+// the gradient, and coarse the coarsest level's sigma: it weighs each
+// ground's pull, and its 3 sigma reach sets the crop around the holes.
+func edgeStops(holesPath, dir string, smooth, coarse float64) ([]piece, error) {
+	reach := int(math.Ceil(3 * coarse))
 	holes, err := decode(holesPath)
 	if err != nil {
 		return nil, err
@@ -45,7 +49,7 @@ func edgeStops(holesPath, dir string, smooth float64, reach int) ([]piece, error
 	labels, comps := label(holes)
 	var pieces []piece
 	for i, cl := range cluster(comps, reach, holes.Bounds()) {
-		drop := stopped(holes, labels, cl.region, smooth)
+		drop := stopped(holes, labels, cl.region, smooth, coarse)
 		if drop == nil {
 			continue
 		}
@@ -61,7 +65,7 @@ func edgeStops(holesPath, dir string, smooth float64, reach int) ([]piece, error
 // stopped floods region r from its holes' borders and returns the missed
 // parts that are another ground, with the edge pixels joined to them, black
 // on transparent, or nil if there are none.
-func stopped(holes image.RGBA64Image, labels []int32, r image.Rectangle, smooth float64) *image.NRGBA {
+func stopped(holes image.RGBA64Image, labels []int32, r image.Rectangle, smooth, coarse float64) *image.NRGBA {
 	fb := holes.Bounds()
 	w, h := r.Dx(), r.Dy()
 	n := w * h
@@ -139,18 +143,13 @@ func stopped(holes image.RGBA64Image, labels []int32, r image.Rectangle, smooth 
 	// The flood misses ground pixels (at or below the limit) and edge pixels
 	// (above it). Each connected part of the missed ground is judged on its
 	// own: it is another ground if its tone is off the ring's by more than
-	// the spread and by enough, weighted by its size, to shift the fill a
-	// level; otherwise it is a pocket of the same ground.
-	// The edge pixels joined to a cut-off part then go with it; edge pixels
-	// joined to none (specks, fibres, an edge line between two kept grounds)
-	// stay.
-	nKnown := 0
-	for _, k := range known {
-		if k {
-			nKnown++
-		}
-	}
+	// the spread, and by enough, weighted by what the coarsest level draws
+	// from it into the holes, to shift the fill a level; otherwise it is a
+	// pocket of the same ground. The edge pixels joined to a cut-off part
+	// then go with it; edge pixels joined to none (specks, fibres, an edge
+	// line between two kept grounds) stay.
 	missedGround := func(i int) bool { return known[i] && !reached[i] && grad[i] <= limit }
+	var knownW []float32 // the known pixels under the coarsest level, made once a part needs it
 	seen := make([]bool, n)
 	cut := make([]bool, n)
 	var cutOff []int
@@ -169,8 +168,13 @@ func stopped(holes image.RGBA64Image, labels []int32, r image.Rectangle, smooth 
 			tones[k] = float64(lo[i])
 		}
 		off := math.Abs(median(tones) - ground)
-		if off <= spread || off*float64(len(part))/float64(nKnown) < minStop {
-
+		if off <= spread {
+			continue
+		}
+		if knownW == nil {
+			knownW = blur(wt, w, h, coarse)
+		}
+		if off*pull(part, known, knownW, w, h, coarse) < minStop {
 			continue
 		}
 		for _, i := range part {
@@ -209,4 +213,23 @@ func flood(seeds []int, w, h int, pass func(i int) bool, take func(i int)) {
 			}
 		}
 	}
+}
+
+// pull is the most the coarsest blur level, at sigma coarse, draws from part
+// at any hole pixel: the part's weight there over the weight of all the
+// known pixels (knownW, their blur). It depends only on the part and the
+// ground near the holes, not on how far the crop runs.
+func pull(part []int, known []bool, knownW []float32, w, h int, coarse float64) float64 {
+	ind := make([]float32, w*h)
+	for _, i := range part {
+		ind[i] = 1
+	}
+	pw := blur(ind, w, h, coarse)
+	var most float64
+	for i, k := range known {
+		if !k && knownW[i] > 1e-6 {
+			most = max(most, float64(pw[i]/knownW[i]))
+		}
+	}
+	return most
 }
