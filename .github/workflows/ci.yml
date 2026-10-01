@@ -1,9 +1,13 @@
 name: CI
 
 on:
+  # A main-only repo pushes to main on every commit, so CI runs at release
+  # (the v* tag) and on PRs. `just gate` is the local check; run it on main
+  # on demand with `gh workflow run ci.yml`.
   push:
-    branches: [main]
+    tags: ["v*"]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   test:
