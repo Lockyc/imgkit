@@ -1,9 +1,9 @@
 // Package ml runs imgkit's Python: embedded single-file scripts whose
 // dependencies are fixed by a committed `uv lock --script` lockfile and run
 // with --locked, and pinned upstream CLIs through `uv tool run`. uv is the
-// only Python tool a user installs. Python is here only because the matting
-// and inpainting models have no Go, Rust or shell equivalent of comparable
-// quality.
+// only Python tool a user installs. Python is here only because the matting,
+// inpainting and super-resolution models have no Go, Rust or shell
+// equivalent of comparable quality.
 package ml
 
 import (

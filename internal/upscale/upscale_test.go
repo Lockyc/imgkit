@@ -10,33 +10,49 @@ import (
 	"testing"
 
 	"github.com/lockyc/imgkit/internal/enginetest"
+	"github.com/lockyc/imgkit/internal/pins"
 )
 
 func TestUpscale(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	dir := t.TempDir()
 	t.Chdir(dir)
-	log := enginetest.Stub(t, "realesrgan-ncnn-vulkan", `while [ "$1" != "-o" ]; do shift; done; printf png > "$2"`)
+	log := enginetest.Stub(t, "uv", `while [ "$1" != "--out" ]; do shift; done; printf png > "$2"`)
 	out := filepath.Join(dir, "o.png")
 	var o, e bytes.Buffer
 	if code := Main(context.Background(), []string{"in.png", out}, &o, &e); code != 0 {
 		t.Fatalf("code %d: %s", code, e.String())
 	}
 	c := enginetest.Calls(t, log)[0]
-	i := slices.Index(c, "-m")
-	if i < 0 || filepath.Base(c[i+1]) != "models" || !slices.Contains(c, "realesrgan-x4plus") {
-		t.Errorf("args %q", c)
+	if !strings.HasSuffix(c[3], "upscale.py") {
+		t.Errorf("script %q", c[3])
 	}
+	for _, want := range []string{"--image", "in.png", "--out", out, "--model", pins.DAT.Repo, "--revision", pins.DAT.Revision, "--file", pins.DAT.File} {
+		if !slices.Contains(c, want) {
+			t.Errorf("args lack %s: %q", want, c)
+		}
+	}
+}
+
+func TestUpscaleForbidden(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Chdir(t.TempDir())
+	log := enginetest.Stub(t, "uv", `exit 0`)
 	os.WriteFile("imgkit.toml", []byte(`synthesis = "forbid"`), 0o644)
-	e.Reset()
-	if code := Main(context.Background(), []string{"in.png", out}, &o, &e); code != 1 || !strings.Contains(e.String(), "forbid") {
+	var o, e bytes.Buffer
+	if code := Main(context.Background(), []string{"in.png", "o.png"}, &o, &e); code != 1 || !strings.Contains(e.String(), "forbid") {
 		t.Errorf("forbidden: code %d, %q", code, e.String())
+	}
+	if len(enginetest.Calls(t, log)) != 0 {
+		t.Error("engine ran")
 	}
 }
 
 func TestUpscaleRefusesSameFile(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	dir := t.TempDir()
 	t.Chdir(dir)
-	log := enginetest.Stub(t, "realesrgan-ncnn-vulkan", `printf png > /dev/null`)
+	log := enginetest.Stub(t, "uv", `exit 0`)
 	in := filepath.Join(dir, "in.png")
 	os.WriteFile(in, []byte("source"), 0o644)
 	var o, e bytes.Buffer

@@ -1,6 +1,6 @@
-// Package upscale enlarges an image 4× with Real-ESRGAN (realesrgan-x4plus),
-// for artwork with no larger original. It synthesises detail, so
-// imgkit.toml can forbid it. A project that forbids synthesis resamples
+// Package upscale enlarges an image 4× with DAT (internal/ml/scripts/
+// upscale.py), for artwork with no larger original. It synthesises detail,
+// so imgkit.toml can forbid it. A project that forbids synthesis resamples
 // plainly in its recipe instead.
 package upscale
 
@@ -13,13 +13,12 @@ import (
 	"strings"
 
 	"github.com/lockyc/imgkit/internal/cli"
-	"github.com/lockyc/imgkit/internal/engine"
+	"github.com/lockyc/imgkit/internal/ml"
+	"github.com/lockyc/imgkit/internal/pins"
 	"github.com/lockyc/imgkit/internal/policy"
 )
 
 const usage = "upscale <in> <out.png>"
-
-const esrgan = "realesrgan-ncnn-vulkan"
 
 // Main runs `imgkit upscale`.
 func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
@@ -47,16 +46,7 @@ func run(ctx context.Context, in, out string) error {
 	if err := policy.CheckSynthesis(wd, "upscale"); err != nil {
 		return err
 	}
-	bin, err := engine.Resolve(esrgan)
-	if err != nil {
-		return err
-	}
-	real, err := filepath.EvalSymlinks(bin)
-	if err != nil {
-		return err
-	}
-	// The release ships its models beside the binary.
-	models := filepath.Join(filepath.Dir(real), "models")
-	_, err = engine.Run(ctx, engine.Cmd{Engine: esrgan, Args: []string{"-i", in, "-o", out, "-n", "realesrgan-x4plus", "-m", models}, Inputs: []string{in}, Outputs: []string{out}})
+	args := []string{"--image", in, "--out", out, "--model", pins.DAT.Repo, "--revision", pins.DAT.Revision, "--file", pins.DAT.File}
+	_, err = ml.RunScript(ctx, "upscale.py", args, []string{in}, []string{out})
 	return err
 }

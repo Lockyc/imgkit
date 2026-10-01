@@ -69,7 +69,7 @@ func TestTableIsWellFormed(t *testing.T) {
 			}
 		}
 	}
-	for _, name := range []string{"magick", "gs", "pdfinfo", "pdffonts", "pdfimages", "pdftotext", "qpdf", "qrencode", "uv", "swiftc", "chrome-headless-shell", "realesrgan-ncnn-vulkan"} {
+	for _, name := range []string{"magick", "gs", "pdfinfo", "pdffonts", "pdfimages", "pdftotext", "qpdf", "qrencode", "uv", "swiftc", "chrome-headless-shell"} {
 		if _, ok := Lookup(name); !ok {
 			t.Errorf("Lookup(%q) failed", name)
 		}

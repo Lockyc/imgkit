@@ -57,17 +57,6 @@ func chs(platform, sha string) Asset {
 	}
 }
 
-const esrganVersion = "v0.2.5.0"
-
-// The macOS build is a universal binary, so both darwin architectures share it.
-func esrgan(build, sha string) Asset {
-	return Asset{
-		URL:    "https://github.com/xinntao/Real-ESRGAN/releases/download/" + esrganVersion + "/realesrgan-ncnn-vulkan-20220424-" + build + ".zip",
-		SHA256: sha,
-		Bin:    "realesrgan-ncnn-vulkan",
-	}
-}
-
 func poppler(name string, usedBy ...string) Engine {
 	return Engine{
 		Name: name, Kind: Minimum,
@@ -111,7 +100,7 @@ var Engines = []Engine{
 		Name: "uv", Kind: Minimum,
 		VersionArgs: []string{"--version"}, VersionRe: `uv (\d+\.\d+\.\d+)`, Min: "0.12.0",
 		Install: map[string]string{"darwin": "brew install uv", "linux": "curl -LsSf https://astral.sh/uv/install.sh | sh"},
-		UsedBy:  []string{"cutout", "grade", "inpaint"},
+		UsedBy:  []string{"cutout", "grade", "inpaint", "upscale"},
 	},
 	{
 		Name: "swiftc", Kind: Minimum, GOOS: []string{"darwin"},
@@ -127,15 +116,6 @@ var Engines = []Engine{
 			"linux/amd64":  chs("linux64", "636aa5c79f2693632e9921b8bbb050038ba11672e02346c06c20f991aed096f9"),
 		}},
 		UsedBy: []string{"render"},
-	},
-	{
-		Name: "realesrgan-ncnn-vulkan", Kind: Managed,
-		Download: &Download{Version: esrganVersion, Assets: map[string]Asset{
-			"darwin/arm64": esrgan("macos", "e0ad05580abfeb25f8d8fb55aaf7bedf552c375b5b4d9bd3c8d59764d2cc333a"),
-			"darwin/amd64": esrgan("macos", "e0ad05580abfeb25f8d8fb55aaf7bedf552c375b5b4d9bd3c8d59764d2cc333a"),
-			"linux/amd64":  esrgan("ubuntu", "e5aa6eb131234b87c0c51f82b89390f5e3e642b7b70f2b9bbe95b6a285a40c96"),
-		}},
-		UsedBy: []string{"upscale"},
 	},
 }
 
@@ -217,11 +197,16 @@ func fields(v string) []int {
 
 // Model is a machine-learning model an ML script downloads on first run,
 // pinned to a Hugging Face commit so a re-uploaded model cannot change a
-// result silently.
-type Model struct{ Repo, Revision string }
+// result silently. File names the weights file when the script loads one
+// file rather than the whole repo.
+type Model struct{ Repo, Revision, File string }
 
 // ViTMatte refines a coarse mask into a per-strand alpha matte.
 var ViTMatte = Model{Repo: "hustvl/vitmatte-base-composition-1k", Revision: "bf486d01a7d9e3dbcc8400f7942835caf0eaf76e"}
+
+// DAT is the Dual Aggregation Transformer, ×4, trained for fidelity to the
+// original (PSNR) rather than for invented texture.
+var DAT = Model{Repo: "OzzyGT/DAT_X4", Revision: "549c8c9c3611084e1dc0ce235eba8c5fa8bca9ae", File: "DAT_x4.safetensors"}
 
 // PyTool is an upstream Python CLI run with `uv tool run`, resolved as of
 // ExcludeNewer so its transitive dependencies cannot drift.

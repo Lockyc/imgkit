@@ -58,10 +58,9 @@ ahead of the data directory and `PATH`; tests use it to stand in sh stubs.
 |---|---|
 | ImageMagick 7 | minimum version |
 | chrome-headless-shell | exact version and sha256, installed by `doctor --install` under `$XDG_DATA_HOME/imgkit/` |
-| Real-ESRGAN (ncnn-vulkan) | exact version and sha256, installed by `doctor --install` under `$XDG_DATA_HOME/imgkit/` |
 | Ghostscript, poppler, qpdf, qrencode | minimum version |
 | Apple Vision | the OS; macOS 14 or later |
-| Python ML (ViTMatte, BiRefNet, LaMa, grade fit) | PEP 723 header with `exclude-newer`, and a committed `uv lock --script` lockfile run with `--locked`; Hugging Face model revision pinned by commit |
+| Python ML (ViTMatte, BiRefNet, LaMa, DAT, grade fit) | PEP 723 header with `exclude-newer`, and a committed `uv lock --script` lockfile run with `--locked`; Hugging Face model revision pinned by commit |
 
 Python runs only for the ML steps, where no Go, Rust or shell tool of
 comparable quality exists. `uv` is the only Python tool a user installs.
