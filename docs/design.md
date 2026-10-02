@@ -104,7 +104,10 @@ colours, or renders what it is given.
   rounds to, and fails when the PDF's page box does not match `--size` (no
   matching `@page` prints Letter). It deletes stale outputs first, stamps the
   PNG's pHYs at 96 × scale DPI, and fails if the page text contains a
-  `--fail-if` string: dumped DOM for PNG, `pdftotext` for PDF.
+  `--fail-if` string: dumped DOM for PNG and HTML, `pdftotext` for PDF.
+  `--html` judges Chrome's output by content, not exit status: a dump ending
+  in `</html>` is whole, since Chrome's teardown watchdog can exit non-zero
+  after writing the full page (`engine.Cmd.AllowExit`).
 - **press** — Ghostscript pdfwrite with outlined text, CMYK conversion to a
   supplied ICC, fixed media from the input's page box, and images downsampled
   only above 1.5 × `--max-ppi`. It then checks the result has no fonts, no

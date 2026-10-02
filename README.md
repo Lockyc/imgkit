@@ -7,9 +7,9 @@
 [![License](https://img.shields.io/github/license/lockyc/plate)](LICENSE)
 
 Image and render operations for print and web pipelines, as one command:
-lift a subject out of a photo, fill or enlarge artwork, render HTML to PNG and
-PDF, make a press-ready PDF, match a colour grade. Each operation wraps the
-best engine for the job at a pinned version, and its quality is measured
+lift a subject out of a photo, fill or enlarge artwork, render HTML to PNG, PDF
+or its settled DOM, make a press-ready PDF, match a colour grade. Each
+operation wraps the best engine for the job at a pinned version, and its quality is measured
 against a committed set of test images rather than judged by eye.
 
 ## Status
@@ -27,7 +27,7 @@ the exceptions listed under [Platforms](#platforms). What comes next is in
 | `upscale` ⚠ | Enlarges 4× with DAT, a super-resolution model that sharpens what the small image holds rather than inventing texture | `plate upscale <in> <out.png>` |
 | `grade fit` | Recovers a reference image's colour grade as a lookup table | `plate grade fit --ref ref.png [--ref-crop x,y,w,h] [--exclude x,y,w,h]... [--level 8] [--min-inliers 40] <subject.png> <out-hald.png>` |
 | `grade apply` | Applies that lookup table, keeping transparency | `plate grade apply --clut hald.png <in> <out.png>` |
-| `render` | HTML to PNG or PDF with headless Chrome, guarded against Chrome's silent failures | `plate render [--png out.png] [--pdf out.pdf] [--size WxH] [--scale S] [--budget MS] [--fail-if TEXT]... <page.html\|http(s) or file URL>` |
+| `render` | HTML to PNG, PDF or settled HTML with headless Chrome, guarded against Chrome's silent failures | `plate render [--png out.png] [--pdf out.pdf] [--html out.html] [--size WxH] [--scale S] [--budget MS] [--fail-if TEXT]... <page.html\|http(s) or file URL>` |
 | `press` | Converts a PDF to a print master (text as outlines, CMYK colour) and checks it against a soft proof | `plate press --icc profile.icc [--max-ppi N] [--max-rmse R] [--region x,y,w,h:max]... [--proof-width PX] <in.pdf> <out.pdf>` |
 | `diff` | Compares two images after lining them up, so a small shift doesn't fail everything | `plate diff [--tolerance N] [--max-shift PX] [--step PX] [--threshold PCT] [--out diff.png] <a> <b>` |
 | `fonts` | Embeds web fonts into a CSS file so a page renders from the filesystem | `plate fonts [--display block] -o fonts.css FILE:FAMILY:WEIGHT:STYLE...` |
@@ -36,6 +36,10 @@ the exceptions listed under [Platforms](#platforms). What comes next is in
 | `version` | Prints plate's version | `plate version` |
 
 `plate <command> -h` lists each flag with its default.
+
+`render --html` writes the page's DOM after its scripts have run, a static
+copy to publish; it needs no `--size`, and refuses a page that does not end in
+`</html>` or that contains a `--fail-if` string.
 
 `render` runs the page outside Chrome's sandbox, with read access to your
 files and open network access: give it only pages you trust.

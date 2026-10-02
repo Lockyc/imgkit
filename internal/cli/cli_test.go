@@ -55,3 +55,20 @@ func TestFloatRefusesNonFinite(t *testing.T) {
 		t.Fatalf("--x 2.5: ok %v x %v", ok, *x)
 	}
 }
+
+func TestIntIsDecimal(t *testing.T) {
+	for in, want := range map[string]int{"0150": 150, "0999": 999, "-3": -3, "12": 12} {
+		fs := Flags("demo", "demo", &bytes.Buffer{})
+		n := Int(fs, "n", 7, "")
+		if err := fs.Parse([]string{"--n", in}); err != nil || *n != want {
+			t.Errorf("--n %s = %d, %v; want %d", in, *n, err, want)
+		}
+	}
+	for _, in := range []string{"0x10", "1e3", "", "1.5"} {
+		fs := Flags("demo", "demo", &bytes.Buffer{})
+		Int(fs, "n", 7, "")
+		if err := fs.Parse([]string{"--n", in}); err == nil {
+			t.Errorf("--n %q accepted", in)
+		}
+	}
+}

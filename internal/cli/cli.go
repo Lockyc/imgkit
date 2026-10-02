@@ -45,6 +45,29 @@ func (f *finite) Set(s string) error {
 	return nil
 }
 
+// Int defines an int flag read in base 10 only. flag.Int reads base 0, so
+// "0150" is octal 104 and "0x10" is 16: a zero-padded number is silently
+// another number.
+func Int(fs *flag.FlagSet, name string, value int, usage string) *int {
+	p := new(int)
+	*p = value
+	fs.Var((*decimal)(p), name, usage)
+	return p
+}
+
+type decimal int
+
+func (d *decimal) String() string { return strconv.Itoa(int(*d)) }
+
+func (d *decimal) Set(s string) error {
+	v, err := strconv.ParseInt(s, 10, strconv.IntSize)
+	if err != nil {
+		return errors.New("want a whole number")
+	}
+	*d = decimal(v)
+	return nil
+}
+
 // Finite parses s as a number, refusing NaN and the infinities, which
 // ParseFloat accepts.
 func Finite(s string) (float64, bool) {

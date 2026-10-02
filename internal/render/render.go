@@ -27,7 +27,7 @@ import (
 	"github.com/lockyc/plate/internal/raster"
 )
 
-const usage = "render [--png out.png] [--pdf out.pdf] [--size WxH] [--scale S] [--budget MS] [--fail-if TEXT]... <page.html|URL>"
+const usage = "render [--png out.png] [--pdf out.pdf] [--html out.html] [--size WxH] [--scale S] [--budget MS] [--fail-if TEXT]... <page.html|URL>"
 
 const chrome = "chrome-headless-shell"
 
@@ -53,6 +53,7 @@ func (m *multi) Set(s string) error { *m = append(*m, s); return nil }
 type job struct {
 	url, local string
 	png, pdf   string
+	html       string
 	w, h       int
 	scale      float64
 	budget     int
@@ -65,6 +66,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fs := cli.Flags("render", usage, stderr)
 	pngOut := fs.String("png", "", "write a PNG screenshot here")
 	pdfOut := fs.String("pdf", "", "write a PDF here")
+	htmlOut := fs.String("html", "", "write the page's DOM here once scripts settle (a static copy with every script's work done)")
 	size := fs.String("size", "", "viewport and expected page size in CSS px, WxH (required with --png)")
 	scale := cli.Float(fs, "scale", 1, "device scale factor; the PNG is size × scale px at 96 × scale dpi")
 	budget := fs.Int("budget", 5000, "virtual-time budget in ms for scripts, fonts and images to settle")
@@ -74,13 +76,13 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if !ok {
 		return code
 	}
-	j := job{png: *pngOut, pdf: *pdfOut, scale: *scale, budget: *budget, failIf: failIf, warn: stderr}
+	j := job{png: *pngOut, pdf: *pdfOut, html: *htmlOut, scale: *scale, budget: *budget, failIf: failIf, warn: stderr}
 	usageErr := func(msg string) int {
 		defer fs.Usage()
 		return cli.Usage(stderr, "render", "%s", msg)
 	}
-	if j.png == "" && j.pdf == "" {
-		return usageErr("give --png, --pdf or both")
+	if j.png == "" && j.pdf == "" && j.html == "" {
+		return usageErr("give --png, --pdf, --html or a combination")
 	}
 	if *size != "" {
 		w, h, err := parseSize(*size)
@@ -95,8 +97,12 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if math.IsNaN(j.scale) || math.IsInf(j.scale, 0) || j.scale <= 0 || j.budget < 0 {
 		return usageErr("--scale must be a finite number above 0 and --budget not below 0")
 	}
-	if j.png != "" && j.pdf != "" && engine.SameFile(j.png, j.pdf) {
-		return usageErr("--png and --pdf name the same file")
+	for _, p := range [][2]string{{"png", j.png}, {"pdf", j.pdf}, {"html", j.html}} {
+		for _, q := range [][2]string{{"png", j.png}, {"pdf", j.pdf}, {"html", j.html}} {
+			if p[0] < q[0] && p[1] != "" && q[1] != "" && engine.SameFile(p[1], q[1]) {
+				return usageErr("--" + p[0] + " and --" + q[0] + " name the same file")
+			}
+		}
 	}
 	u, local, err := pageURL(rest[0])
 	if err != nil {
@@ -151,7 +157,7 @@ func (j job) inputs() []string {
 
 func (j job) run(ctx context.Context) (err error) {
 	var outputs []string
-	for _, o := range []string{j.png, j.pdf} {
+	for _, o := range []string{j.png, j.pdf, j.html} {
 		if o != "" {
 			outputs = append(outputs, o)
 		}
@@ -184,6 +190,11 @@ func (j job) run(ctx context.Context) (err error) {
 	}
 	if j.pdf != "" {
 		if err := j.print(ctx); err != nil {
+			return err
+		}
+	}
+	if j.html != "" {
+		if err := j.dump(ctx); err != nil {
 			return err
 		}
 	}
@@ -268,6 +279,26 @@ func (j job) print(ctx context.Context) error {
 			info.W, info.H, j.w, j.h, ww, wh, j.w, j.h)
 	}
 	return nil
+}
+
+// dump writes the DOM Chrome holds once the virtual-time budget has run.
+// Chrome's exit status is not the verdict: its teardown watchdog can exit
+// non-zero after writing the whole document, so a complete page — one that
+// ends in </html> — is the test.
+func (j job) dump(ctx context.Context) error {
+	args := append(j.base(), "--dump-dom", j.url)
+	res, err := engine.Run(ctx, engine.Cmd{Engine: chrome, Args: args, Inputs: j.inputs(), Timeout: 15 * time.Minute, AllowExit: true})
+	if err != nil {
+		return err
+	}
+	dom := strings.TrimSpace(string(res.Stdout))
+	if !strings.HasSuffix(dom, "</html>") {
+		return fmt.Errorf("Chrome produced no complete page (%d bytes, no closing </html>)", len(dom))
+	}
+	if err := sentinel(dom, j.failIf); err != nil {
+		return err
+	}
+	return os.WriteFile(j.html, []byte(dom), 0o644)
 }
 
 func sentinel(text string, failIf []string) error {

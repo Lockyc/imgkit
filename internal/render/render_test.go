@@ -280,3 +280,45 @@ func TestRenderSameOutputPathSpelledDifferently(t *testing.T) {
 		t.Errorf("code %d, want 2", code)
 	}
 }
+
+func TestHTMLWritesSettledDOM(t *testing.T) {
+	e := setup(t, 100, 50)
+	t.Setenv("FIXTURE_DOM", "<html><body>quoted</body></html>")
+	if code := e.run("--html", e.out("p.html"), e.page); code != 0 {
+		t.Fatalf("exit %d: %s", code, e.stderr.String())
+	}
+	got, _ := os.ReadFile(e.out("p.html"))
+	if string(got) != "<html><body>quoted</body></html>" {
+		t.Errorf("html = %q", got)
+	}
+}
+
+func TestHTMLIgnoresChromeExitWhenPageComplete(t *testing.T) {
+	e := setup(t, 100, 50)
+	t.Setenv("CHROME_EXIT", "2")
+	if code := e.run("--html", e.out("p.html"), e.page); code != 0 {
+		t.Fatalf("exit %d, want 0 for a complete page: %s", code, e.stderr.String())
+	}
+}
+
+func TestHTMLRefusesTruncatedPage(t *testing.T) {
+	e := setup(t, 100, 50)
+	t.Setenv("FIXTURE_DOM", "<html><body>cut sh")
+	if code := e.run("--html", e.out("p.html"), e.page); code != 1 {
+		t.Fatalf("exit %d, want 1", code)
+	}
+	if exists(e.out("p.html")) {
+		t.Error("truncated page left on disk")
+	}
+}
+
+func TestHTMLFailIf(t *testing.T) {
+	e := setup(t, 100, 50)
+	t.Setenv("FIXTURE_DOM", "<html><body>QUOTE FAILED: x</body></html>")
+	if code := e.run("--fail-if", "QUOTE FAILED", "--html", e.out("p.html"), e.page); code != 1 {
+		t.Fatalf("exit %d, want 1", code)
+	}
+	if exists(e.out("p.html")) {
+		t.Error("page with a sentinel left on disk")
+	}
+}
