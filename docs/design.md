@@ -61,7 +61,7 @@ ahead of the data directory and `PATH`; tests use it to stand in sh stubs.
 |---|---|
 | ImageMagick 7 | minimum version |
 | chrome-headless-shell | exact version and sha256, installed by `doctor --install` under `$XDG_DATA_HOME/plate/` |
-| Ghostscript, poppler, qpdf, qrencode, pandoc | minimum version |
+| Ghostscript, poppler, qpdf, qrencode, pandoc, hb-subset | minimum version |
 | Apple Vision | the OS; macOS 14 or later, plus `swiftc` as a minimum-version engine |
 | Python ML scripts (ViTMatte, BiRefNet, DAT, grade fit) | PEP 723 header with `exclude-newer`, and a committed `uv lock --script` lockfile run with `--locked`; ViTMatte and DAT weights pinned by Hugging Face commit in `internal/pins`, BiRefNet's by the pinned `rembg` version |
 | LaMa | the `iopaint` CLI, run through `uv tool run` at a pinned version and `exclude-newer` (`pins.IOPaint`) |

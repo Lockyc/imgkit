@@ -46,6 +46,13 @@ independently of phase 5. Within a phase, order is open.
   has needed a long page. Unlock: such a caller, then a CDP driver behind a
   `--full-page` flag.
 
+- **fonts --subset embeds TTF or OTF, not woff2.** hb-subset writes only
+  the input's sfnt format, so a subset face is about twice the size of the
+  same face as woff2 (Open Sans latin: 33 KB against 16 KB). The woff2
+  encoder (`woff2_compress`) prints no version, so it cannot be pinned like
+  the other engines. Unlock: a pinnable woff2 encoder, or one built into
+  plate, measured on the subset.
+
 - **cutout on semi-transparent subjects.** Smoke, glass or a dandelion
   clock may be refused as "no foreground found": their mask is soft across
   the whole subject, not just at its edge, and the empty-frame check

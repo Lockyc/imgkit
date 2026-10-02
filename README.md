@@ -28,7 +28,7 @@ the exceptions listed under [Platforms](#platforms). What comes next is in
 | `upscale` ⚠ | Enlarges 4× with DAT, a super-resolution model that sharpens what the small image holds rather than inventing texture | `plate upscale <in> <out.png>` |
 | `grade fit` | Recovers a reference image's colour grade as a lookup table | `plate grade fit --ref ref.png [--ref-crop x,y,w,h] [--exclude x,y,w,h]... [--level 8] [--min-inliers 40] <subject.png> <out-hald.png>` |
 | `grade apply` | Applies that lookup table, keeping transparency | `plate grade apply --clut hald.png <in> <out.png>` |
-| `render` | HTML to PNG, PDF or settled HTML with headless Chrome, guarded against Chrome's silent failures | `plate render [--png out.png] [--pdf out.pdf] [--html out.html] [--size WxH] [--scale S] [--budget MS] [--fail-if TEXT]... <page.html\|http(s) or file URL>` |
+| `render` | HTML to PNG, PDF or settled HTML with headless Chrome, guarded against Chrome's silent failures | `plate render [--png out.png [--transparent]] [--pdf out.pdf] [--html out.html] [--size WxH] [--scale S] [--budget MS] [--fail-if TEXT]... <page.html\|http(s) or file URL>` |
 | `press` | Converts a PDF to a print master (text as outlines, CMYK colour) and checks it against a soft proof | `plate press --icc profile.icc [--max-ppi N] [--max-rmse R] [--region x,y,w,h:max]... [--proof-width PX] <in.pdf> <out.pdf>` |
 | `pdf info` | Prints a PDF's metadata and whether it has a text layer, which says whether to read its text or render its pages | `plate pdf info <in.pdf>` |
 | `pdf text` | Extracts a PDF's text with its layout | `plate pdf text [--pages N\|N-M] <in.pdf>` |
@@ -36,7 +36,7 @@ the exceptions listed under [Platforms](#platforms). What comes next is in
 | `pdf images` | Extracts a PDF's embedded images and prints each path | `plate pdf images [--pages N\|N-M] [--out DIR] <in.pdf>` |
 | `doc` | Renders markdown or HTML to a PDF with a plain document look: A4, a running head from the first heading, page numbers, ruled tables | `plate doc [--css FILE] <in.md\|in.html> <out.pdf>` |
 | `diff` | Compares two images after lining them up, so a small shift doesn't fail everything | `plate diff [--tolerance N] [--max-shift PX] [--step PX] [--threshold PCT] [--out diff.png] <a> <b>` |
-| `fonts` | Embeds web fonts into a CSS file so a page renders from the filesystem | `plate fonts [--display block] -o fonts.css FILE:FAMILY:WEIGHT:STYLE...` |
+| `fonts` | Embeds web fonts into a CSS file so a page renders from the filesystem, optionally cut to the characters a language uses | `plate fonts [--display block] [--subset latin] -o fonts.css FILE:FAMILY:WEIGHT:STYLE...` |
 | `qr` | Makes a QR code SVG that any phone camera decodes | `plate qr [--ec L\|M\|Q\|H] [--fg RRGGBB] [--bg RRGGBB] -o out.svg <text>` |
 | `doctor` | Checks every engine against its pin, installs the ones plate manages, and prints the install command for the rest | `plate doctor [--install]` |
 | `version` | Prints plate's version | `plate version` |
@@ -46,6 +46,15 @@ the exceptions listed under [Platforms](#platforms). What comes next is in
 `render --html` writes the page's DOM after its scripts have run, a static
 copy to publish; it needs no `--size`, and refuses a page that does not end in
 `</html>` or that contains a `--fail-if` string.
+
+`render --png --transparent` gives the PNG an alpha channel: whatever the
+page leaves transparent (a `background: transparent` html and body) is
+alpha 0 rather than white, for artwork laid over other artwork.
+
+`fonts --subset latin` cuts each font to Basic Latin, Latin-1 Supplement,
+the common punctuation (dashes, curly quotes, ellipsis) and the euro sign
+before embedding it, which takes a typical text face from about 150 KB to
+about 35 KB. It needs `.ttf` or `.otf` input and keeps that format.
 
 `render` runs the page outside Chrome's sandbox, with read access to your
 files and open network access: give it only pages you trust.
