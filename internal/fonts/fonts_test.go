@@ -5,8 +5,11 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/lockyc/plate/internal/enginetest"
 )
 
 func TestFonts(t *testing.T) {
@@ -103,5 +106,120 @@ func TestFontsFailureRemovesStaleCSS(t *testing.T) {
 	}
 	if _, err := os.Stat(out); !os.IsNotExist(err) {
 		t.Fatal("a failed run left the earlier CSS in place")
+	}
+}
+
+// hbStub stands in for hb-subset: it writes SUBSET-<input name> to the
+// --output-file it is given, or exits $HB_EXIT.
+const hbStub = `out=; in=
+for a in "$@"; do
+  case "$a" in
+    --output-file=*) out="${a#--output-file=}" ;;
+    -*) ;;
+    *) in="$a" ;;
+  esac
+done
+[ "${HB_EXIT:-0}" = 0 ] || { echo "hb-subset: Failed loading font face" >&2; exit "$HB_EXIT"; }
+printf 'SUBSET-%s' "$(basename "$in")" > "$out"`
+
+func TestFontsSubset(t *testing.T) {
+	hb := enginetest.Stub(t, "hb-subset", hbStub)
+	dir := t.TempDir()
+	ttf := filepath.Join(dir, "a.ttf")
+	otf := filepath.Join(dir, "b.otf")
+	os.WriteFile(ttf, []byte("whole font"), 0o644)
+	os.WriteFile(otf, []byte("whole font"), 0o644)
+	out := filepath.Join(dir, "fonts.css")
+	var o, e bytes.Buffer
+	if code := Main(context.Background(), []string{"--subset", "latin", "-o", out, ttf + ":A:400:normal", otf + ":B:700:italic"}, &o, &e); code != 0 {
+		t.Fatalf("code %d: %s", code, e.String())
+	}
+	calls := enginetest.Calls(t, hb)
+	if len(calls) != 2 {
+		t.Fatalf("hb-subset calls %q, want 2", calls)
+	}
+	for i, in := range []string{ttf, otf} {
+		c := calls[i]
+		if !slices.Contains(c, "--unicodes=20-7E,A0-FF,2010-2027,2030-203A,20AC") || c[len(c)-1] != in {
+			t.Errorf("call %d = %q", i, c)
+		}
+		if !slices.ContainsFunc(c, func(a string) bool { return strings.HasPrefix(a, "--output-file=") }) {
+			t.Errorf("call %d has no --output-file: %q", i, c)
+		}
+	}
+	css, _ := os.ReadFile(out)
+	for _, want := range []string{
+		`src: url(data:font/ttf;base64,U1VCU0VULWEudHRm) format("truetype");`, // SUBSET-a.ttf
+		`src: url(data:font/otf;base64,U1VCU0VULWIub3Rm) format("opentype");`, // SUBSET-b.otf
+	} {
+		if !strings.Contains(string(css), want) {
+			t.Errorf("css lacks %s:\n%s", want, css)
+		}
+	}
+	if b, _ := os.ReadFile(ttf); string(b) != "whole font" {
+		t.Error("the source font was changed")
+	}
+}
+
+func TestFontsWithoutSubsetRunsNoEngine(t *testing.T) {
+	hb := enginetest.Stub(t, "hb-subset", hbStub)
+	dir := t.TempDir()
+	ttf := filepath.Join(dir, "a.ttf")
+	os.WriteFile(ttf, []byte("whole font"), 0o644)
+	var o, e bytes.Buffer
+	if code := Main(context.Background(), []string{"-o", filepath.Join(dir, "f.css"), ttf + ":A:400:normal"}, &o, &e); code != 0 {
+		t.Fatalf("code %d: %s", code, e.String())
+	}
+	if len(enginetest.Calls(t, hb)) != 0 {
+		t.Error("hb-subset ran without --subset")
+	}
+}
+
+func TestFontsSubsetRejects(t *testing.T) {
+	hb := enginetest.Stub(t, "hb-subset", hbStub)
+	dir := t.TempDir()
+	ttf := filepath.Join(dir, "a.ttf")
+	woff2 := filepath.Join(dir, "a.woff2")
+	os.WriteFile(ttf, []byte("x"), 0o644)
+	os.WriteFile(woff2, []byte("x"), 0o644)
+	out := filepath.Join(dir, "o.css")
+	for _, c := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"--subset", "cyrillic", "-o", out, ttf + ":A:400:normal"}, "--subset"},
+		{[]string{"--subset", "", "-o", out, ttf + ":A:400:normal"}, "--subset"},
+		{[]string{"--subset", "latin", "-o", out, woff2 + ":A:400:normal"}, ".ttf or .otf"},
+	} {
+		var o, e bytes.Buffer
+		if code := Main(context.Background(), c.args, &o, &e); code != 2 || !strings.Contains(e.String(), c.want) {
+			t.Errorf("%q: code %d stderr %q; want 2 containing %q", c.args, code, e.String(), c.want)
+		}
+	}
+	if len(enginetest.Calls(t, hb)) != 0 {
+		t.Error("hb-subset ran for a refused call")
+	}
+}
+
+func TestFontsSubsetFailureWritesNothing(t *testing.T) {
+	enginetest.Stub(t, "hb-subset", hbStub)
+	t.Setenv("HB_EXIT", "2")
+	dir := t.TempDir()
+	ttf := filepath.Join(dir, "a.ttf")
+	os.WriteFile(ttf, []byte("x"), 0o644)
+	out := filepath.Join(dir, "o.css")
+	os.WriteFile(out, []byte("OLD"), 0o644)
+	var o, e bytes.Buffer
+	if code := Main(context.Background(), []string{"--subset", "latin", "-o", out, ttf + ":A:400:normal"}, &o, &e); code != 1 {
+		t.Fatalf("code %d: %s", code, e.String())
+	}
+	if !strings.Contains(e.String(), "Failed loading font face") {
+		t.Errorf("stderr %q does not carry hb-subset's message", e.String())
+	}
+	if _, err := os.Stat(out); !os.IsNotExist(err) {
+		t.Error("a failed subset left CSS in place")
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 1 {
+		t.Errorf("leftover files: %v", entries)
 	}
 }

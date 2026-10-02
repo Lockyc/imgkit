@@ -92,6 +92,12 @@ var Engines = []Engine{
 		UsedBy:  []string{"doc"},
 	},
 	{
+		Name: "hb-subset", Kind: Minimum,
+		VersionArgs: []string{"--version"}, VersionRe: `hb-subset \(HarfBuzz\) (\d+\.\d+\.\d+)`, Min: "6.0.0",
+		Install: map[string]string{"darwin": "brew install harfbuzz", "linux": "sudo apt install libharfbuzz-bin"},
+		UsedBy:  []string{"fonts"},
+	},
+	{
 		Name: "qpdf", Kind: Minimum,
 		VersionArgs: []string{"--version"}, VersionRe: `qpdf version (\d+\.\d+\.\d+)`, Min: "11.0.0",
 		Install: map[string]string{"darwin": "brew install qpdf", "linux": "sudo apt install qpdf"},
