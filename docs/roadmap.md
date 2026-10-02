@@ -39,6 +39,13 @@ independently of phase 5. Within a phase, order is open.
   measured on have them. Unlock: `doctor` smoke-runs each managed engine
   with `--version` and reports the loader's error.
 
+- **render --png captures the viewport, not the whole page.** The PNG is
+  exactly `--size`; content below it is cut off. Full-page capture needs the
+  DevTools protocol (`Page.captureScreenshot` with `captureBeyondViewport`),
+  which a command-line Chrome call cannot reach. Deferred because no caller
+  has needed a long page. Unlock: such a caller, then a CDP driver behind a
+  `--full-page` flag.
+
 - **cutout on semi-transparent subjects.** Smoke, glass or a dandelion
   clock may be refused as "no foreground found": their mask is soft across
   the whole subject, not just at its edge, and the empty-frame check
