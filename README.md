@@ -41,7 +41,7 @@ the exceptions listed under [Platforms](#platforms). What comes next is in
 files and open network access: give it only pages you trust.
 
 ⚠ These commands create pixels the source never had. A project that forbids
-this puts `synthesis = "forbid"` in an `plate.toml`, and they refuse to run.
+this puts `synthesis = "forbid"` in a `plate.toml`, and they refuse to run.
 
 ## Install
 
