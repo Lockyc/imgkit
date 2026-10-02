@@ -18,7 +18,7 @@ Phases in build order. Each ships when its acceptance gate passes.
 | 3 | Shipped | ML ops: `cutout`, `grade fit`, `inpaint`, `upscale`, `infill` | quality cases pass at their recorded thresholds |
 | 4 | Shipped | `v0.1.0` release | release gate green; README curated |
 | 5 | Not started | Regression check against the pipelines plate replaces, then each project's cutover | no measured regression; each cutover approved by its owner |
-| 6 | Not started | Documents and PDFs: a PDF inspect command (metadata with a text-layer check, text, page renders, embedded images) and markdown to PDF with a neutral default document stylesheet, pandoc pinned | unit tests with stub engines; a rendered document checked page by page |
+| 6 | Shipped | Documents and PDFs: a PDF inspect command (metadata with a text-layer check, text, page renders, embedded images) and markdown to PDF with a neutral default document stylesheet, pandoc pinned | unit tests with stub engines; a rendered document checked page by page |
 
 **Phase 5 changes nothing in a consuming project until its owner approves
 that project's cutover.** The check runs plate beside the existing pipeline,
@@ -26,7 +26,9 @@ reading the project's assets without writing to its tree.
 
 ## Sequencing
 
-Phases run in order. Within a phase, order is open.
+Phases run in order, except where one needs nothing from the phase before
+it: phase 6 adds commands and cuts no project over, so it runs
+independently of phase 5. Within a phase, order is open.
 
 ## Deferred
 

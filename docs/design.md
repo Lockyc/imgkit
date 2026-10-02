@@ -22,7 +22,7 @@ recipe, because wrapping them would add nothing.
 ```
 main.go              dispatch
 internal/<op>/       one package per command (cutout, inpaint, infill, upscale,
-                     grade, render, press, diff, fonts, qr, doctor)
+                     grade, render, press, pdf, doc, diff, fonts, qr, doctor)
 internal/cli/        flag, exit-code and error conventions every command shares
 internal/engine/     the one way an external tool is run
 internal/frame/      the source pre-pass the ML ops read: oriented, sRGB, 8-bit
@@ -31,7 +31,8 @@ internal/icc/        the embedded sRGB profile
 internal/imgsize/    image dimensions without decoding pixels
 internal/enginetest/ sh stubs that stand in for engines in tests
 internal/pins/       the one table of engine versions
-internal/pdf/        PDF page count, page boxes and text through poppler
+internal/pdf/        PDF page count, page boxes and text through poppler; the
+                     pdf command
 internal/policy/     the plate.toml synthesis policy
 internal/raster/     in-process pixel work: load, measure, small PNG edits
 internal/ml/         embedded single-file Python scripts (uv run --script)
@@ -60,7 +61,7 @@ ahead of the data directory and `PATH`; tests use it to stand in sh stubs.
 |---|---|
 | ImageMagick 7 | minimum version |
 | chrome-headless-shell | exact version and sha256, installed by `doctor --install` under `$XDG_DATA_HOME/plate/` |
-| Ghostscript, poppler, qpdf, qrencode | minimum version |
+| Ghostscript, poppler, qpdf, qrencode, pandoc | minimum version |
 | Apple Vision | the OS; macOS 14 or later, plus `swiftc` as a minimum-version engine |
 | Python ML scripts (ViTMatte, BiRefNet, DAT, grade fit) | PEP 723 header with `exclude-newer`, and a committed `uv lock --script` lockfile run with `--locked`; ViTMatte and DAT weights pinned by Hugging Face commit in `internal/pins`, BiRefNet's by the pinned `rembg` version |
 | LaMa | the `iopaint` CLI, run through `uv tool run` at a pinned version and `exclude-newer` (`pins.IOPaint`) |
@@ -128,7 +129,8 @@ colours, or renders what it is given.
 - **upscale** — DAT ×4 over the normalised frame in overlapping tiles
   (internal/ml/scripts/upscale.py); alpha, which the model does not take, is
   enlarged separately.
-- **inpaint, fonts, qr** — as the README table describes.
+- **inpaint, fonts, qr, pdf, doc** — as the README table and each package's
+  doc comment describe.
 
 ## Platforms and errors
 

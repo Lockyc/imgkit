@@ -6,11 +6,12 @@
 ![Go](https://img.shields.io/badge/go-1.27%2B-00ADD8?logo=go&logoColor=white)
 [![License](https://img.shields.io/github/license/lockyc/plate)](LICENSE)
 
-Image and render operations for print and web pipelines, as one command:
-lift a subject out of a photo, fill or enlarge artwork, render HTML to PNG, PDF
-or its settled DOM, make a press-ready PDF, match a colour grade. Each
-operation wraps the best engine for the job at a pinned version, and its quality is measured
-against a committed set of test images rather than judged by eye.
+Image, render and document operations for print and web pipelines, as one
+command: lift a subject out of a photo, fill or enlarge artwork, render HTML to
+PNG, PDF or its settled DOM, turn markdown into a PDF, look inside a PDF, make
+a press-ready PDF, match a colour grade. Each operation wraps the best engine
+for the job at a pinned version, and its quality is measured against a
+committed set of test images rather than judged by eye.
 
 ## Status
 
@@ -29,6 +30,11 @@ the exceptions listed under [Platforms](#platforms). What comes next is in
 | `grade apply` | Applies that lookup table, keeping transparency | `plate grade apply --clut hald.png <in> <out.png>` |
 | `render` | HTML to PNG, PDF or settled HTML with headless Chrome, guarded against Chrome's silent failures | `plate render [--png out.png] [--pdf out.pdf] [--html out.html] [--size WxH] [--scale S] [--budget MS] [--fail-if TEXT]... <page.html\|http(s) or file URL>` |
 | `press` | Converts a PDF to a print master (text as outlines, CMYK colour) and checks it against a soft proof | `plate press --icc profile.icc [--max-ppi N] [--max-rmse R] [--region x,y,w,h:max]... [--proof-width PX] <in.pdf> <out.pdf>` |
+| `pdf info` | Prints a PDF's metadata and whether it has a text layer, which says whether to read its text or render its pages | `plate pdf info <in.pdf>` |
+| `pdf text` | Extracts a PDF's text with its layout | `plate pdf text [--pages N\|N-M] <in.pdf>` |
+| `pdf pages` | Renders PDF pages to PNG and prints each path | `plate pdf pages [--pages N\|N-M] [--out DIR] [--dpi N] <in.pdf>` |
+| `pdf images` | Extracts a PDF's embedded images and prints each path | `plate pdf images [--pages N\|N-M] [--out DIR] <in.pdf>` |
+| `doc` | Renders markdown or HTML to a PDF with a plain document look: A4, a running head from the first heading, page numbers, ruled tables | `plate doc [--css FILE] <in.md\|in.html> <out.pdf>` |
 | `diff` | Compares two images after lining them up, so a small shift doesn't fail everything | `plate diff [--tolerance N] [--max-shift PX] [--step PX] [--threshold PCT] [--out diff.png] <a> <b>` |
 | `fonts` | Embeds web fonts into a CSS file so a page renders from the filesystem | `plate fonts [--display block] -o fonts.css FILE:FAMILY:WEIGHT:STYLE...` |
 | `qr` | Makes a QR code SVG that any phone camera decodes | `plate qr [--ec L\|M\|Q\|H] [--fg RRGGBB] [--bg RRGGBB] -o out.svg <text>` |
