@@ -113,9 +113,9 @@ func infoMain(ctx context.Context, args []string, stdout, stderr io.Writer) int 
 	}
 	stdout.Write(res.Stdout)
 	if has {
-		fmt.Fprintln(stdout, "Text layer:     yes")
+		fmt.Fprintln(stdout, "Text layer:      yes")
 	} else {
-		fmt.Fprintln(stdout, "Text layer:     no (scanned? render it with `plate pdf pages` and look)")
+		fmt.Fprintln(stdout, "Text layer:      no (scanned? render it with `plate pdf pages` and look)")
 	}
 	return 0
 }
@@ -275,8 +275,15 @@ func extractImages(ctx context.Context, in string, r pageRange, out string) (pat
 		return nil, err
 	}
 	defer func() {
-		if err != nil && made {
+		if err == nil {
+			return
+		}
+		if made {
 			os.RemoveAll(dir)
+			return
+		}
+		for _, p := range paths {
+			os.Remove(p)
 		}
 	}()
 	stage, err := os.MkdirTemp(dir, ".plate-images-")

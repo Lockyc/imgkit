@@ -1,5 +1,6 @@
-// Package pdf reads what plate needs from a PDF through poppler: page
-// count, page boxes and text.
+// Package pdf reads PDFs through poppler: the page count, page boxes and
+// text other commands need, and `plate pdf`, which inspects a PDF (info
+// with a text-layer check, text, page renders, embedded images).
 package pdf
 
 import (
