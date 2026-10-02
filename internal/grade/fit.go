@@ -34,8 +34,8 @@ func fitMain(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	var crop, exclude rects
 	fs.Var(&crop, "ref-crop", "the subject's box in the reference, x,y,w,h px")
 	fs.Var(&exclude, "exclude", "a box inside the crop drawn over the subject, left out of the fit (repeatable)")
-	level := fs.Int("level", 8, "HALD level: level³ px square, level² steps per channel")
-	minInliers := fs.Int("min-inliers", 40, "RANSAC inliers needed to trust the registration")
+	level := cli.Int(fs, "level", 8, "HALD level: level³ px square, level² steps per channel")
+	minInliers := cli.Int(fs, "min-inliers", 40, "RANSAC inliers needed to trust the registration")
 	rest, code, ok := cli.Parse(fs, args, 2)
 	if !ok {
 		return code

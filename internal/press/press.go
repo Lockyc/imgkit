@@ -69,7 +69,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	icc := fs.String("icc", "", "the CMYK output profile (required)")
 	maxPPI := cli.Float(fs, "max-ppi", 450, "downsample images above 1.5 × this resolution, to it")
 	maxRMSE := cli.Float(fs, "max-rmse", defaultMaxRMSE, "soft-proof RMSE allowed over a whole page")
-	proofWidth := fs.Int("proof-width", 3000, "soft-proof render width in px; RMSE settles by about 3000")
+	proofWidth := cli.Int(fs, "proof-width", 3000, "soft-proof render width in px; RMSE settles by about 3000")
 	var specs multi
 	fs.Var(&specs, "region", "x,y,w,h:max: a page region, as fractions, held to its own RMSE (repeatable)")
 	rest, code, ok := cli.Parse(fs, args, 2)

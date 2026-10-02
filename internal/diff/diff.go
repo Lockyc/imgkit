@@ -131,9 +131,9 @@ func picture(b *image.RGBA64, mask *image.Gray, rows image.Rectangle) *image.RGB
 // Exit 1: over it. Exit 2: could not compare.
 func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fs := cli.Flags("diff", usage, stderr)
-	tol := fs.Uint("tolerance", 28, "per-pixel luma difference, 0-255, at or below which pixels count as equal")
-	maxShift := fs.Int("max-shift", 60, "px of vertical misalignment to search")
-	step := fs.Int("step", 2, "search granularity in px")
+	tol := cli.Int(fs, "tolerance", 28, "per-pixel luma difference, 0-255, at or below which pixels count as equal")
+	maxShift := cli.Int(fs, "max-shift", 60, "px of vertical misalignment to search")
+	step := cli.Int(fs, "step", 2, "search granularity in px")
 	threshold := cli.Float(fs, "threshold", 0, "exit 1 when more than this percent of pixels differ")
 	outPath := fs.String("out", "", "write a picture of the changed pixels here (PNG)")
 	rest, code, ok := cli.Parse(fs, args, 2)
@@ -141,7 +141,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return code
 	}
 	fail := func(err error) int { fmt.Fprintf(stderr, "plate diff: %v\n", err); return 2 }
-	if *tol > 255 {
+	if *tol < 0 || *tol > 255 {
 		return fail(fmt.Errorf("--tolerance must be 0-255"))
 	}
 	if *maxShift < 0 {

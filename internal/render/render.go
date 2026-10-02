@@ -69,7 +69,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	htmlOut := fs.String("html", "", "write the page's DOM here once scripts settle (a static copy with every script's work done)")
 	size := fs.String("size", "", "viewport and expected page size in CSS px, WxH (required with --png)")
 	scale := cli.Float(fs, "scale", 1, "device scale factor; the PNG is size × scale px at 96 × scale dpi")
-	budget := fs.Int("budget", 5000, "virtual-time budget in ms for scripts, fonts and images to settle")
+	budget := cli.Int(fs, "budget", 5000, "virtual-time budget in ms for scripts, fonts and images to settle")
 	var failIf multi
 	fs.Var(&failIf, "fail-if", "fail when `TEXT` appears in the page: its markup (dumped DOM) for --png, its extracted text for --pdf (repeatable)")
 	rest, code, ok := cli.Parse(fs, args, 1)
