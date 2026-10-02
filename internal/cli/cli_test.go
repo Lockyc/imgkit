@@ -19,7 +19,7 @@ func TestParse(t *testing.T) {
 	if _, code, ok := Parse(Flags("demo", "demo <in>", &errb), []string{"a", "b"}, 1); ok || code != 2 {
 		t.Fatalf("wrong positional count: code %d ok %v", code, ok)
 	}
-	if !strings.Contains(errb.String(), "usage: imgkit demo <in>") {
+	if !strings.Contains(errb.String(), "usage: plate demo <in>") {
 		t.Errorf("usage not printed: %q", errb.String())
 	}
 	if _, code, ok := Parse(Flags("demo", "demo", &errb), []string{"-h"}, 0); ok || code != 0 {
@@ -35,7 +35,7 @@ func TestFail(t *testing.T) {
 	if code := Fail(&errb, "render", errors.New("render would be 300.0 MP")); code != 1 {
 		t.Fatalf("code %d", code)
 	}
-	if errb.String() != "imgkit render: render would be 300.0 MP\n" {
+	if errb.String() != "plate render: render would be 300.0 MP\n" {
 		t.Errorf("stderr %q", errb.String())
 	}
 }

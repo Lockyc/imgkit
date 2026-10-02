@@ -13,9 +13,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lockyc/imgkit/internal/engine"
-	"github.com/lockyc/imgkit/internal/enginetest"
-	"github.com/lockyc/imgkit/internal/pins"
+	"github.com/lockyc/plate/internal/engine"
+	"github.com/lockyc/plate/internal/enginetest"
+	"github.com/lockyc/plate/internal/pins"
 )
 
 var ctx = context.Background()
@@ -141,7 +141,7 @@ func TestManagedMissingPointsAtInstall(t *testing.T) {
 	t.Setenv(engine.EnvOverride(e.Name), "")
 	var out bytes.Buffer
 	run(ctx, []pins.Engine{e}, false, nil, &out)
-	if !strings.Contains(out.String(), "imgkit doctor --install") {
+	if !strings.Contains(out.String(), "plate doctor --install") {
 		t.Errorf("report:\n%s", out.String())
 	}
 }

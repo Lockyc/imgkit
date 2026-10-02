@@ -5,8 +5,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/lockyc/imgkit/internal/engine"
-	"github.com/lockyc/imgkit/internal/enginetest"
+	"github.com/lockyc/plate/internal/engine"
+	"github.com/lockyc/plate/internal/enginetest"
 )
 
 func TestCallsRoundTripsAwkwardArguments(t *testing.T) {

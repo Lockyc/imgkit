@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lockyc/imgkit/internal/enginetest"
+	"github.com/lockyc/plate/internal/enginetest"
 )
 
 const magickStub = `if [ "$1" = identify ]; then printf '%s\n%s\n' "${IN_INFO:-False 200 100}" "${CLUT_INFO:-True 512 512}"; exit 0; fi

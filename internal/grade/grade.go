@@ -15,15 +15,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/lockyc/imgkit/internal/cli"
-	"github.com/lockyc/imgkit/internal/engine"
-	"github.com/lockyc/imgkit/internal/frame"
-	"github.com/lockyc/imgkit/internal/icc"
+	"github.com/lockyc/plate/internal/cli"
+	"github.com/lockyc/plate/internal/engine"
+	"github.com/lockyc/plate/internal/frame"
+	"github.com/lockyc/plate/internal/icc"
 )
 
-const usage = "grade fit --ref ref.png [...] <subject.png> <out-hald.png>\n       imgkit grade apply --clut hald.png <in> <out.png>"
+const usage = "grade fit --ref ref.png [...] <subject.png> <out-hald.png>\n       plate grade apply --clut hald.png <in> <out.png>"
 
-// Main dispatches `imgkit grade <subcommand>`.
+// Main dispatches `plate grade <subcommand>`.
 func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if len(args) > 0 {
 		switch args[0] {
@@ -33,7 +33,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			return applyMain(ctx, args[1:], stdout, stderr)
 		}
 	}
-	fmt.Fprintf(stderr, "usage: imgkit %s\n", usage)
+	fmt.Fprintf(stderr, "usage: plate %s\n", usage)
 	return 2
 }
 

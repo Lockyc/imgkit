@@ -1,4 +1,4 @@
-# imgkit — task runner
+# plate — task runner
 #
 # `default` is the house self-contained clip-to-width `just --list` (same in every repo,
 # public or private). Canonical text + rationale: lockyc-config skill, references/just-pretty.md.
@@ -13,7 +13,7 @@ default:
 # Build the binary
 [group("build")]
 build:
-    go build -o imgkit .
+    go build -o plate .
 
 # Run the test suite
 [group("check")]
@@ -51,14 +51,14 @@ gate:
     go test ./...
     echo "✓ gate passed"
 
-# Install imgkit onto GOBIN and print its version
+# Install plate onto GOBIN and print its version
 [group("build")]
 install:
     #!/usr/bin/env bash
     set -euo pipefail
     go install .
     bin="$(go env GOBIN)"; [ -n "$bin" ] || bin="$(go env GOPATH)/bin"
-    "$bin/imgkit" version
+    "$bin/plate" version
 
 # Re-resolve every embedded ML script's lockfile (after editing a PEP 723 header)
 [group("build")]

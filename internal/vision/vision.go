@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lockyc/imgkit/internal/engine"
+	"github.com/lockyc/plate/internal/engine"
 )
 
 //go:embed mask.swift
@@ -39,11 +39,11 @@ func available(goos, version string) error {
 
 func helper(ctx context.Context) (string, error) {
 	dir, err := engine.Cached("vision", map[string][]byte{"mask.swift": source}, func(dir string) error {
-		src, out := filepath.Join(dir, "mask.swift"), filepath.Join(dir, "imgkit-vision")
+		src, out := filepath.Join(dir, "mask.swift"), filepath.Join(dir, "plate-vision")
 		_, err := engine.Run(ctx, engine.Cmd{Engine: "swiftc", Args: []string{"-O", src, "-o", out}, Inputs: []string{src}, Outputs: []string{out}, Timeout: 5 * time.Minute})
 		return err
 	})
-	return filepath.Join(dir, "imgkit-vision"), err
+	return filepath.Join(dir, "plate-vision"), err
 }
 
 // Mask writes in's foreground, alpha as the mask, to out.
@@ -55,6 +55,6 @@ func Mask(ctx context.Context, in, out string) error {
 	if err != nil {
 		return err
 	}
-	_, err = engine.Run(ctx, engine.Cmd{Engine: "imgkit-vision", Path: bin, Args: []string{in, out}, Inputs: []string{in}, Outputs: []string{out}, Timeout: 5 * time.Minute})
+	_, err = engine.Run(ctx, engine.Cmd{Engine: "plate-vision", Path: bin, Args: []string{in, out}, Inputs: []string{in}, Outputs: []string{out}, Timeout: 5 * time.Minute})
 	return err
 }

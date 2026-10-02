@@ -1,6 +1,6 @@
-// Package cli holds the flag and error conventions every imgkit command
+// Package cli holds the flag and error conventions every plate command
 // shares: flags before positional arguments, exit 2 for a usage error, exit
-// 1 for a failed operation, errors printed as "imgkit <op>: <reason>".
+// 1 for a failed operation, errors printed as "plate <op>: <reason>".
 package cli
 
 import (
@@ -12,12 +12,12 @@ import (
 	"strconv"
 )
 
-// Flags makes the flag set for "imgkit <op>".
+// Flags makes the flag set for "plate <op>".
 func Flags(op, usage string, stderr io.Writer) *flag.FlagSet {
-	fs := flag.NewFlagSet("imgkit "+op, flag.ContinueOnError)
+	fs := flag.NewFlagSet("plate "+op, flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintf(stderr, "usage: imgkit %s\n", usage)
+		fmt.Fprintf(stderr, "usage: plate %s\n", usage)
 		fs.PrintDefaults()
 	}
 	return fs
@@ -70,12 +70,12 @@ func Parse(fs *flag.FlagSet, args []string, positional int) (rest []string, code
 
 // Usage reports a usage error for op and returns exit status 2.
 func Usage(stderr io.Writer, op, format string, a ...any) int {
-	fmt.Fprintf(stderr, "imgkit %s: %s\n", op, fmt.Sprintf(format, a...))
+	fmt.Fprintf(stderr, "plate %s: %s\n", op, fmt.Sprintf(format, a...))
 	return 2
 }
 
 // Fail reports err for op and returns exit status 1.
 func Fail(stderr io.Writer, op string, err error) int {
-	fmt.Fprintf(stderr, "imgkit %s: %v\n", op, err)
+	fmt.Fprintf(stderr, "plate %s: %v\n", op, err)
 	return 1
 }

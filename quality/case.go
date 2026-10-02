@@ -1,4 +1,4 @@
-// Package quality runs every imgkit operation over openly licensed or
+// Package quality runs every plate operation over openly licensed or
 // synthetic test assets and checks each result against a measured
 // threshold. The real run is `just quality` (build tag quality): it needs
 // the engines and models and runs locally, not in CI. Untagged tests check
@@ -16,7 +16,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	"github.com/lockyc/imgkit/internal/engine"
+	"github.com/lockyc/plate/internal/engine"
 )
 
 // Asset is one registered file in quality/assets/.
@@ -36,8 +36,8 @@ type Case struct {
 	Name   string            `toml:"name"`
 	Why    string            `toml:"why"`    // the shortfall this case pins
 	Files  map[string]string `toml:"files"`  // written into the case directory first
-	Setup  [][]string        `toml:"setup"`  // steps before run; argv[0] "imgkit" or a pinned engine
-	Run    []string          `toml:"run"`    // imgkit arguments under test
+	Setup  [][]string        `toml:"setup"`  // steps before run; argv[0] "plate" or a pinned engine
+	Run    []string          `toml:"run"`    // plate arguments under test
 	Post   [][]string        `toml:"post"`   // steps after run, before the metric
 	Exit   int               `toml:"exit"`   // expected exit status of run
 	Stderr string            `toml:"stderr"` // substring run's stderr must contain
@@ -85,7 +85,7 @@ func LoadCases(path string) ([]Case, error) {
 }
 
 // Env is where a case runs.
-type Env struct{ Assets, Tmp, Imgkit string }
+type Env struct{ Assets, Tmp, Plate string }
 
 var placeholder = regexp.MustCompile(`\{(asset|tmp):([^}]+)\}`)
 
@@ -131,8 +131,8 @@ func (e Env) argv(step []string) []string {
 
 func (e Env) step(ctx context.Context, step []string) error {
 	argv := e.argv(step)
-	path := e.Imgkit
-	if argv[0] != "imgkit" {
+	path := e.Plate
+	if argv[0] != "plate" {
 		p, err := engine.Resolve(argv[0])
 		if err != nil {
 			return err
@@ -160,7 +160,7 @@ func (e Env) RunCase(ctx context.Context, c Case) error {
 			return fmt.Errorf("setup: %w", err)
 		}
 	}
-	cmd := exec.CommandContext(ctx, e.Imgkit, e.argv(c.Run)...)
+	cmd := exec.CommandContext(ctx, e.Plate, e.argv(c.Run)...)
 	cmd.Dir = e.Tmp
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
@@ -172,7 +172,7 @@ func (e Env) RunCase(ctx context.Context, c Case) error {
 		return err
 	}
 	if code != c.Exit {
-		return fmt.Errorf("imgkit %s exited %d, want %d\n%s", strings.Join(c.Run, " "), code, c.Exit, stderr.String())
+		return fmt.Errorf("plate %s exited %d, want %d\n%s", strings.Join(c.Run, " "), code, c.Exit, stderr.String())
 	}
 	if c.Stderr != "" && !strings.Contains(stderr.String(), c.Stderr) {
 		return fmt.Errorf("stderr lacks %q:\n%s", c.Stderr, stderr.String())

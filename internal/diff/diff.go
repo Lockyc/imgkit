@@ -16,9 +16,9 @@ import (
 	"image/color"
 	"io"
 
-	"github.com/lockyc/imgkit/internal/cli"
-	"github.com/lockyc/imgkit/internal/engine"
-	"github.com/lockyc/imgkit/internal/raster"
+	"github.com/lockyc/plate/internal/cli"
+	"github.com/lockyc/plate/internal/engine"
+	"github.com/lockyc/plate/internal/raster"
 )
 
 const usage = "diff [--tolerance N] [--max-shift PX] [--step PX] [--threshold PCT] [--out diff.png] <a> <b>"
@@ -127,7 +127,7 @@ func picture(b *image.RGBA64, mask *image.Gray, rows image.Rectangle) *image.RGB
 	return out
 }
 
-// Main runs `imgkit diff`. Exit 0: within the threshold (or none given).
+// Main runs `plate diff`. Exit 0: within the threshold (or none given).
 // Exit 1: over it. Exit 2: could not compare.
 func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fs := cli.Flags("diff", usage, stderr)
@@ -140,7 +140,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if !ok {
 		return code
 	}
-	fail := func(err error) int { fmt.Fprintf(stderr, "imgkit diff: %v\n", err); return 2 }
+	fail := func(err error) int { fmt.Fprintf(stderr, "plate diff: %v\n", err); return 2 }
 	if *tol > 255 {
 		return fail(fmt.Errorf("--tolerance must be 0-255"))
 	}

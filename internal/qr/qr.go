@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/lockyc/imgkit/internal/cli"
-	"github.com/lockyc/imgkit/internal/engine"
+	"github.com/lockyc/plate/internal/cli"
+	"github.com/lockyc/plate/internal/engine"
 )
 
 const usage = "qr [--ec L|M|Q|H] [--fg RRGGBB] [--bg RRGGBB] -o out.svg <text>"
@@ -33,7 +33,7 @@ func luminance(hex string) float64 {
 	return 0.2126*lin(0) + 0.7152*lin(2) + 0.0722*lin(4)
 }
 
-// Main runs `imgkit qr`.
+// Main runs `plate qr`.
 func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fs := cli.Flags("qr", usage, stderr)
 	ec := fs.String("ec", "M", "error correction: L, M, Q or H")

@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lockyc/imgkit/internal/engine"
-	"github.com/lockyc/imgkit/internal/enginetest"
-	"github.com/lockyc/imgkit/internal/pins"
+	"github.com/lockyc/plate/internal/engine"
+	"github.com/lockyc/plate/internal/enginetest"
+	"github.com/lockyc/plate/internal/pins"
 )
 
 var ctx = context.Background()
@@ -70,7 +70,7 @@ func TestRunExitStatusFailsAndRemovesOutput(t *testing.T) {
 func TestFindRefusesAMissingOverride(t *testing.T) {
 	t.Setenv(engine.EnvOverride("magick"), filepath.Join(t.TempDir(), "nope"))
 	var nie *engine.NotInstalledError
-	if _, err := engine.Resolve("magick"); !errors.As(err, &nie) || !strings.Contains(err.Error(), "IMGKIT_ENGINE_MAGICK") {
+	if _, err := engine.Resolve("magick"); !errors.As(err, &nie) || !strings.Contains(err.Error(), "PLATE_ENGINE_MAGICK") {
 		t.Fatalf("err = %v", err)
 	}
 }

@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/lockyc/imgkit/internal/engine"
-	"github.com/lockyc/imgkit/internal/icc"
+	"github.com/lockyc/plate/internal/engine"
+	"github.com/lockyc/plate/internal/icc"
 )
 
 // Options shape the frame.

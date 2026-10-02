@@ -10,7 +10,7 @@ import (
 	"github.com/makiuchi-d/gozxing"
 	"github.com/makiuchi-d/gozxing/qrcode"
 
-	"github.com/lockyc/imgkit/internal/raster"
+	"github.com/lockyc/plate/internal/raster"
 )
 
 // Params are a case's metric parameters, placeholders already expanded.

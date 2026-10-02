@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lockyc/imgkit/internal/enginetest"
+	"github.com/lockyc/plate/internal/enginetest"
 )
 
 // frameStub plays magick writing a frame: "frame" to its last argument,

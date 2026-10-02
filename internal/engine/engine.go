@@ -1,4 +1,4 @@
-// Package engine is the one way imgkit runs an external tool. Every call gets
+// Package engine is the one way plate runs an external tool. Every call gets
 // a timeout; success means exit status 0 and every
 // declared output existing and non-empty, because Chrome exits 0 when it
 // renders nothing and prints noise on stderr when it succeeds; a declared
@@ -26,38 +26,38 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lockyc/imgkit/internal/pins"
+	"github.com/lockyc/plate/internal/pins"
 )
 
 // DefaultTimeout applies when a Cmd sets none.
 const DefaultTimeout = 10 * time.Minute
 
-// EnvOverride names the variable that points imgkit at a specific executable
+// EnvOverride names the variable that points plate at a specific executable
 // for an engine, ahead of the data directory and PATH.
 func EnvOverride(name string) string {
-	return "IMGKIT_ENGINE_" + strings.ToUpper(strings.ReplaceAll(name, "-", "_"))
+	return "PLATE_ENGINE_" + strings.ToUpper(strings.ReplaceAll(name, "-", "_"))
 }
 
-// DataDir holds managed engines: $XDG_DATA_HOME/imgkit, else ~/.local/share/imgkit.
+// DataDir holds managed engines: $XDG_DATA_HOME/plate, else ~/.local/share/plate.
 func DataDir() (string, error) { return xdg("XDG_DATA_HOME", ".local/share") }
 
 // CacheDir holds rebuildable state (materialised scripts, compiled helpers):
-// $XDG_CACHE_HOME/imgkit, else ~/.cache/imgkit.
+// $XDG_CACHE_HOME/plate, else ~/.cache/plate.
 func CacheDir() (string, error) { return xdg("XDG_CACHE_HOME", ".cache") }
 
 func xdg(env, fallback string) (string, error) {
 	if d := os.Getenv(env); d != "" {
-		return filepath.Join(d, "imgkit"), nil
+		return filepath.Join(d, "plate"), nil
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, fallback, "imgkit"), nil
+	return filepath.Join(home, fallback, "plate"), nil
 }
 
 // Cached returns a cache directory holding files, named by a hash of their
-// names and contents so a new imgkit never runs a file an older one left
+// names and contents so a new plate never runs a file an older one left
 // behind. When the directory is absent it is built in a fresh one: files are
 // written, then build (if not nil) runs in it, then it is renamed into place
 // whole, so a reader never sees a half-built directory and concurrent builds
@@ -167,11 +167,11 @@ func executable(p string) bool {
 	return err == nil && fi.Mode().IsRegular() && fi.Mode()&0o111 != 0
 }
 
-// Cmd is one engine invocation. Inputs and Outputs are paths as imgkit sees
+// Cmd is one engine invocation. Inputs and Outputs are paths as plate sees
 // them, relative to its own working directory rather than Dir.
 type Cmd struct {
 	Engine      string // pin-table name; resolves the executable unless Path is set
-	Path        string // an executable imgkit built itself; Engine is then only a label
+	Path        string // an executable plate built itself; Engine is then only a label
 	Args        []string
 	Timeout     time.Duration // 0 means DefaultTimeout
 	StderrFatal bool          // any stderr output fails the call
@@ -306,7 +306,7 @@ func pathArgs(c Cmd) []string {
 
 // scratch is an anonymous temporary file: unlinked at once, gone on Close.
 func scratch() (*os.File, error) {
-	f, err := os.CreateTemp("", "imgkit-")
+	f, err := os.CreateTemp("", "plate-")
 	if err != nil {
 		return nil, err
 	}

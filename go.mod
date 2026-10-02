@@ -1,4 +1,4 @@
-module github.com/lockyc/imgkit
+module github.com/lockyc/plate
 
 go 1.27.1
 

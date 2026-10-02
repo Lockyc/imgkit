@@ -21,10 +21,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lockyc/imgkit/internal/cli"
-	"github.com/lockyc/imgkit/internal/engine"
-	"github.com/lockyc/imgkit/internal/pdf"
-	"github.com/lockyc/imgkit/internal/raster"
+	"github.com/lockyc/plate/internal/cli"
+	"github.com/lockyc/plate/internal/engine"
+	"github.com/lockyc/plate/internal/pdf"
+	"github.com/lockyc/plate/internal/raster"
 )
 
 const usage = "render [--png out.png] [--pdf out.pdf] [--size WxH] [--scale S] [--budget MS] [--fail-if TEXT]... <page.html|URL>"
@@ -60,7 +60,7 @@ type job struct {
 	warn       io.Writer
 }
 
-// Main runs `imgkit render`.
+// Main runs `plate render`.
 func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fs := cli.Flags("render", usage, stderr)
 	pngOut := fs.String("png", "", "write a PNG screenshot here")
@@ -240,7 +240,7 @@ func (j job) screenshot(ctx context.Context) error {
 
 func (j job) print(ctx context.Context) error {
 	if j.w != 0 && (j.w%8 != 0 || j.h%8 != 0) {
-		fmt.Fprintf(j.warn, "imgkit render: warning: Chrome rounds PDF page sizes to multiples of 8 CSS px, so %dx%d will not print at exactly that size\n", j.w, j.h)
+		fmt.Fprintf(j.warn, "plate render: warning: Chrome rounds PDF page sizes to multiples of 8 CSS px, so %dx%d will not print at exactly that size\n", j.w, j.h)
 	}
 	args := append(j.base(), "--no-pdf-header-footer", "--print-to-pdf="+j.pdf, j.url)
 	if _, err := engine.Run(ctx, engine.Cmd{Engine: chrome, Args: args, Inputs: j.inputs(), Outputs: []string{j.pdf}, Timeout: 15 * time.Minute}); err != nil {

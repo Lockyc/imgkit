@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lockyc/imgkit/internal/raster"
+	"github.com/lockyc/plate/internal/raster"
 )
 
 // ground writes a w x h ground whose grey level and grain amplitude come from

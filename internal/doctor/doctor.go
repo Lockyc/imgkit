@@ -1,5 +1,5 @@
 // Package doctor reports every engine in the pin table against this
-// machine, and installs the engines imgkit manages (--install). Engines a
+// machine, and installs the engines plate manages (--install). Engines a
 // package manager provides are reported with the command that installs them.
 package doctor
 
@@ -14,17 +14,17 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/lockyc/imgkit/internal/cli"
-	"github.com/lockyc/imgkit/internal/engine"
-	"github.com/lockyc/imgkit/internal/pins"
+	"github.com/lockyc/plate/internal/cli"
+	"github.com/lockyc/plate/internal/engine"
+	"github.com/lockyc/plate/internal/pins"
 )
 
 const usage = "doctor [--install]"
 
-// Main runs `imgkit doctor`.
+// Main runs `plate doctor`.
 func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fs := cli.Flags("doctor", usage, stderr)
-	install := fs.Bool("install", false, "download and install the engines imgkit manages")
+	install := fs.Bool("install", false, "download and install the engines plate manages")
 	if _, code, ok := cli.Parse(fs, args, 0); !ok {
 		return code
 	}

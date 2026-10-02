@@ -2,7 +2,7 @@
 // upscale.py), for artwork with no larger original. The model reads the
 // normalised frame (internal/frame), so rotation, colour profile, bit depth
 // and palette transparency are handled once. It synthesises detail,
-// so imgkit.toml can forbid it. A project that forbids synthesis resamples
+// so plate.toml can forbid it. A project that forbids synthesis resamples
 // plainly in its recipe instead.
 package upscale
 
@@ -14,16 +14,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/lockyc/imgkit/internal/cli"
-	"github.com/lockyc/imgkit/internal/engine"
-	imgframe "github.com/lockyc/imgkit/internal/frame"
-	"github.com/lockyc/imgkit/internal/ml"
-	"github.com/lockyc/imgkit/internal/pins"
+	"github.com/lockyc/plate/internal/cli"
+	"github.com/lockyc/plate/internal/engine"
+	imgframe "github.com/lockyc/plate/internal/frame"
+	"github.com/lockyc/plate/internal/ml"
+	"github.com/lockyc/plate/internal/pins"
 )
 
 const usage = "upscale <in> <out.png>\n\nThe output is an 8-bit PNG, alpha kept where the source has any."
 
-// Main runs `imgkit upscale`.
+// Main runs `plate upscale`.
 func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fs := cli.Flags("upscale", usage, stderr)
 	rest, code, ok := cli.Parse(fs, args, 2)
@@ -46,7 +46,7 @@ func run(ctx context.Context, in, out string) error {
 	if engine.SameFile(in, out) {
 		return fmt.Errorf("%s is both an input and an output", in)
 	}
-	tmp, err := os.MkdirTemp("", "imgkit-upscale-")
+	tmp, err := os.MkdirTemp("", "plate-upscale-")
 	if err != nil {
 		return err
 	}

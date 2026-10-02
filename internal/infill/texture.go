@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/lockyc/imgkit/internal/raster"
+	"github.com/lockyc/plate/internal/raster"
 )
 
 // Texture transfer: the blur fill carries the ground's colour but none of

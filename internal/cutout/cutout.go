@@ -19,14 +19,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/lockyc/imgkit/internal/cli"
-	"github.com/lockyc/imgkit/internal/engine"
-	imgframe "github.com/lockyc/imgkit/internal/frame"
-	"github.com/lockyc/imgkit/internal/imgsize"
-	"github.com/lockyc/imgkit/internal/ml"
-	"github.com/lockyc/imgkit/internal/pins"
-	"github.com/lockyc/imgkit/internal/raster"
-	"github.com/lockyc/imgkit/internal/vision"
+	"github.com/lockyc/plate/internal/cli"
+	"github.com/lockyc/plate/internal/engine"
+	imgframe "github.com/lockyc/plate/internal/frame"
+	"github.com/lockyc/plate/internal/imgsize"
+	"github.com/lockyc/plate/internal/ml"
+	"github.com/lockyc/plate/internal/pins"
+	"github.com/lockyc/plate/internal/raster"
+	"github.com/lockyc/plate/internal/vision"
 )
 
 const usage = "cutout [--coarse vision|birefnet] [--height PX] [--tile PX] [--band-in D] [--band-out D] [--despill PRESET] [--despill-hue A:B] [--despill-clean A:B] [--despill-chroma A:B] [--despill-lmax L] [--despill-hue-end H] <in> <out.png>"
@@ -92,7 +92,7 @@ type job struct {
 	despill                 despill
 }
 
-// Main runs `imgkit cutout`.
+// Main runs `plate cutout`.
 func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fs := cli.Flags("cutout", usage, stderr)
 	coarse := fs.String("coarse", defaultCoarse(), "coarse mask: vision (macOS) or birefnet")
@@ -190,7 +190,7 @@ func (j job) run(ctx context.Context) (int, int, error) {
 	if h > sh {
 		return 0, 0, fmt.Errorf("--height %d would upsample the %d px source; a cut-out is never upsampled", h, sh)
 	}
-	tmp, err := os.MkdirTemp("", "imgkit-cutout-")
+	tmp, err := os.MkdirTemp("", "plate-cutout-")
 	if err != nil {
 		return 0, 0, err
 	}

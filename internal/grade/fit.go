@@ -9,10 +9,10 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/lockyc/imgkit/internal/cli"
-	"github.com/lockyc/imgkit/internal/engine"
-	"github.com/lockyc/imgkit/internal/frame"
-	"github.com/lockyc/imgkit/internal/ml"
+	"github.com/lockyc/plate/internal/cli"
+	"github.com/lockyc/plate/internal/engine"
+	"github.com/lockyc/plate/internal/frame"
+	"github.com/lockyc/plate/internal/ml"
 )
 
 var rectRe = regexp.MustCompile(`^\d+,\d+,\d+,\d+$`)
@@ -70,7 +70,7 @@ func fit(ctx context.Context, subject, ref, out string, extra []string) ([]byte,
 	if engine.SameFile(subject, out) || engine.SameFile(ref, out) {
 		return nil, fmt.Errorf("%s is also an input; write the result elsewhere", out)
 	}
-	tmp, err := os.MkdirTemp("", "imgkit-gradefit-")
+	tmp, err := os.MkdirTemp("", "plate-gradefit-")
 	if err != nil {
 		return nil, err
 	}

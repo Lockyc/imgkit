@@ -1,4 +1,4 @@
-// Package raster is imgkit's in-process pixel work: loading, measuring and
+// Package raster is plate's in-process pixel work: loading, measuring and
 // small PNG edits that would cost a full re-encode through an engine.
 // Images are premultiplied 16-bit RGBA, so colour comparisons read a
 // transparent pixel as black.
@@ -38,7 +38,7 @@ func Load(path string) (*image.RGBA64, error) {
 // beside path and renames it into place, so a failed save leaves path as
 // it was rather than truncated.
 func SavePNG(path string, img image.Image) error {
-	f, err := os.CreateTemp(filepath.Dir(path), ".imgkit-*.png")
+	f, err := os.CreateTemp(filepath.Dir(path), ".plate-*.png")
 	if err != nil {
 		return err
 	}

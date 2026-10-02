@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lockyc/imgkit/internal/enginetest"
-	"github.com/lockyc/imgkit/internal/pins"
+	"github.com/lockyc/plate/internal/enginetest"
+	"github.com/lockyc/plate/internal/pins"
 )
 
 // magickStub writes "frame" to the frame path, less its PNG32: prefix.

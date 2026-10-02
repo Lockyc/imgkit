@@ -14,7 +14,7 @@ func TestQuality(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bin := filepath.Join(t.TempDir(), "imgkit")
+	bin := filepath.Join(t.TempDir(), "plate")
 	if out, err := exec.Command("go", "build", "-o", bin, "..").CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)
 	}
@@ -22,7 +22,7 @@ func TestQuality(t *testing.T) {
 	t.Logf("%d cases", len(cases))
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
-			env := Env{Assets: assets, Tmp: t.TempDir(), Imgkit: bin}
+			env := Env{Assets: assets, Tmp: t.TempDir(), Plate: bin}
 			if err := env.RunCase(context.Background(), c); err != nil {
 				t.Fatal(err)
 			}

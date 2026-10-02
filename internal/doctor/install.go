@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/lockyc/imgkit/internal/engine"
-	"github.com/lockyc/imgkit/internal/pins"
+	"github.com/lockyc/plate/internal/engine"
+	"github.com/lockyc/plate/internal/pins"
 )
 
 type getter func(ctx context.Context, url string) (io.ReadCloser, error)

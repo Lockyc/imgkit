@@ -55,7 +55,7 @@ why    = "a Chrome PDF with text, a photo and brand colours presses to outlined 
 files  = { "page.html" = '''<!doctype html><style>@page{size:1200px 896px;margin:0}html,body{margin:0;width:1200px;height:896px}body{background:#fdfcf1;font:bold 96px sans-serif;color:#062d5f}img{width:600px;height:400px;display:block}.bar{position:absolute;bottom:0;width:100%;height:100px;background:#f7a81b;color:#062d5f;font-size:40px}</style><p>Sample heading</p><img src="photo.jpg"><div class="bar">Footer text, 1 Example St</div>''' }
 setup  = [
   ["magick", "-size", "1200x800", "gradient:#c9a27e-#35606b", "-seed", "7", "-attenuate", "0.3", "+noise", "Gaussian", "-quality", "92", "{tmp:photo.jpg}"],
-  ["imgkit", "render", "--size", "1200x896", "--pdf", "{tmp:src.pdf}", "{tmp:page.html}"],
+  ["plate", "render", "--size", "1200x896", "--pdf", "{tmp:src.pdf}", "{tmp:page.html}"],
 ]
 run    = ["press", "--icc", "{asset:Coated_Fogra39L_VIGC_300.icc}", "--region", "0,0.88,1,0.12:0.06", "{tmp:src.pdf}", "{tmp:press.pdf}"]
 stdout = "CMYK only"
@@ -86,7 +86,7 @@ name   = "qr-decodes"
 why    = "the code must decode to exactly the text given"
 files  = { "page.html" = '''<!doctype html><style>html,body{margin:0;background:#fff}img{display:block;width:137px;margin:40px}</style><img src="qr.svg">''' }
 run    = ["qr", "--fg", "062D5F", "-o", "{tmp:qr.svg}", "https://example.org/sample"]
-post   = [["imgkit", "render", "--size", "400x400", "--scale", "1.5", "--png", "{tmp:qr.png}", "{tmp:page.html}"]]
+post   = [["plate", "render", "--size", "400x400", "--scale", "1.5", "--png", "{tmp:qr.png}", "{tmp:page.html}"]]
 metric = "qr-decodes"
 params = { image = "{tmp:qr.png}", text = "https://example.org/sample" }
 min    = 1
@@ -181,7 +181,7 @@ name   = "cutout-tiles-match-whole-frame"
 why    = "tiling ViTMatte must not change the matte or leave a seam"
 setup  = [["magick", "{asset:portrait-foliage.jpg}", "-resize", "x1400", "{tmp:small.jpg}"]]
 run    = ["cutout", "--tile", "1024", "{tmp:small.jpg}", "{tmp:tiled.png}"]
-post   = [["imgkit", "cutout", "--tile", "0", "{tmp:small.jpg}", "{tmp:whole.png}"]]
+post   = [["plate", "cutout", "--tile", "0", "{tmp:small.jpg}", "{tmp:whole.png}"]]
 metric = "rmse"
 params = { a = "{tmp:tiled.png}", b = "{tmp:whole.png}", channels = "alpha" }
 max    = 0.0067
@@ -335,7 +335,7 @@ max    = 0.21
 [[case]]
 name   = "synthesis-forbidden"
 why    = "a project that forbids synthesis must never get synthesised pixels"
-files  = { "imgkit.toml" = 'synthesis = "forbid"' }
+files  = { "plate.toml" = 'synthesis = "forbid"' }
 setup  = [["magick", "-size", "64x64", "xc:white", "{tmp:m.png}"]]
 run    = ["infill", "--mask", "{tmp:m.png}", "{tmp:m.png}", "{tmp:out.png}"]
 exit   = 1
@@ -411,7 +411,7 @@ setup  = [
   ["magick", "{tmp:truth.png}", "-background", "#ddd", "-flatten", "-resize", "85%", "-gravity", "center", "-extent", "150%x120%", "{tmp:ref.png}"],
 ]
 run    = ["grade", "fit", "--ref", "{tmp:ref.png}", "{tmp:subject.png}", "{tmp:hald.png}"]
-post   = [["imgkit", "grade", "apply", "--clut", "{tmp:hald.png}", "{tmp:subject.png}", "{tmp:graded.png}"]]
+post   = [["plate", "grade", "apply", "--clut", "{tmp:hald.png}", "{tmp:subject.png}", "{tmp:graded.png}"]]
 metric = "rmse"
 params = { a = "{tmp:graded.png}", b = "{tmp:truth.png}", region = "0.25,0.25,0.5,0.5" }
 max    = 0.0073

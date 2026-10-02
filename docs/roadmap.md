@@ -6,21 +6,22 @@ links:
     note: the architecture each phase builds toward
 ---
 
-# imgkit — roadmap
+# plate — roadmap
 
 Phases in build order. Each ships when its acceptance gate passes.
 
 | Phase | Lane | Scope | Gate |
 |---|---|---|---|
 | 0 | Shipped | Repo, CLI stub, `version`, CI | `just gate` |
-| 1 | Shipped | `internal/engine`, `internal/pins`, `doctor`, the `imgkit.toml` synthesis policy, the `quality/` harness | stub-engine tests; `doctor` reports this machine accurately |
+| 1 | Shipped | `internal/engine`, `internal/pins`, `doctor`, the `plate.toml` synthesis policy, the `quality/` harness | stub-engine tests; `doctor` reports this machine accurately |
 | 2 | Shipped | Deterministic ops: `render`, `press`, `diff`, `fonts`, `qr`, `grade apply` | unit tests and quality cases pass |
 | 3 | Shipped | ML ops: `cutout`, `grade fit`, `inpaint`, `upscale`, `infill` | quality cases pass at their recorded thresholds |
 | 4 | Shipped | `v0.1.0` release | release gate green; README curated |
-| 5 | Not started | Regression check against the pipelines imgkit replaces, then each project's cutover | no measured regression; each cutover approved by its owner |
+| 5 | Not started | Regression check against the pipelines plate replaces, then each project's cutover | no measured regression; each cutover approved by its owner |
+| 6 | Not started | Documents and PDFs: a PDF inspect command (metadata with a text-layer check, text, page renders, embedded images) and markdown to PDF with a neutral default document stylesheet, pandoc pinned | unit tests with stub engines; a rendered document checked page by page |
 
 **Phase 5 changes nothing in a consuming project until its owner approves
-that project's cutover.** The check runs imgkit beside the existing pipeline,
+that project's cutover.** The check runs plate beside the existing pipeline,
 reading the project's assets without writing to its tree.
 
 ## Sequencing
@@ -32,7 +33,7 @@ Phases run in order. Within a phase, order is open.
 - **doctor runs no managed engine.** `doctor` reports chrome-headless-shell
   ok once its pinned build is unpacked, without starting it, so a Linux host
   missing Chrome's shared libraries (libnss3 and the like) passes `doctor`
-  and fails at the first `render`. Deferred because the hosts imgkit is
+  and fails at the first `render`. Deferred because the hosts plate is
   measured on have them. Unlock: `doctor` smoke-runs each managed engine
   with `--version` and reports the loader's error.
 

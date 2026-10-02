@@ -63,7 +63,7 @@ import time
 import cv2
 import numpy as np
 import torch
-from imgkit_device import pick
+from plate_device import pick
 from PIL import Image
 from pymatting import estimate_foreground_ml
 from transformers import VitMatteForImageMatting, VitMatteImageProcessor

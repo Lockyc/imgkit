@@ -4,7 +4,7 @@
 // coarse to fine, so a hole takes the colour of what is nearest on its side
 // of any strong edge (edgeStops). The blur carries no grain, so texture then
 // lays the ground's own fine detail, in patches taken from around the hole,
-// over the fill. It synthesises pixels, so imgkit.toml can forbid it.
+// over the fill. It synthesises pixels, so plate.toml can forbid it.
 package infill
 
 import (
@@ -16,15 +16,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/lockyc/imgkit/internal/cli"
-	"github.com/lockyc/imgkit/internal/engine"
-	"github.com/lockyc/imgkit/internal/frame"
-	"github.com/lockyc/imgkit/internal/imgsize"
+	"github.com/lockyc/plate/internal/cli"
+	"github.com/lockyc/plate/internal/engine"
+	"github.com/lockyc/plate/internal/frame"
+	"github.com/lockyc/plate/internal/imgsize"
 )
 
 const usage = "infill --mask mask.png [--levels 150,60,20,6] [--grain 1] [--seed 1] <in> <out.png>\n\nThe output keeps the input's bit depth and colour profile, turned upright by its EXIF rotation."
 
-// Main runs `imgkit infill`.
+// Main runs `plate infill`.
 func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fs := cli.Flags("infill", usage, stderr)
 	mask := fs.String("mask", "", "white where the holes are, same size as the image (required)")
@@ -60,7 +60,7 @@ func run(ctx context.Context, in, mask, out string, radii []int, grain float64, 
 	if engine.SameFile(in, out) || engine.SameFile(mask, out) {
 		return fmt.Errorf("%s is also an input; write the result elsewhere", out)
 	}
-	tmp, err := os.MkdirTemp("", "imgkit-infill-")
+	tmp, err := os.MkdirTemp("", "plate-infill-")
 	if err != nil {
 		return err
 	}

@@ -1,4 +1,4 @@
-// Command imgkit runs image and render operations for print and web
+// Command plate runs image and render operations for print and web
 // pipelines. See README.md for the command set and docs/design.md for how it
 // is built.
 package main
@@ -12,19 +12,19 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/lockyc/imgkit/internal/cli"
-	"github.com/lockyc/imgkit/internal/cutout"
-	"github.com/lockyc/imgkit/internal/diff"
-	"github.com/lockyc/imgkit/internal/doctor"
-	"github.com/lockyc/imgkit/internal/fonts"
-	"github.com/lockyc/imgkit/internal/grade"
-	"github.com/lockyc/imgkit/internal/infill"
-	"github.com/lockyc/imgkit/internal/inpaint"
-	"github.com/lockyc/imgkit/internal/policy"
-	"github.com/lockyc/imgkit/internal/press"
-	"github.com/lockyc/imgkit/internal/qr"
-	"github.com/lockyc/imgkit/internal/render"
-	"github.com/lockyc/imgkit/internal/upscale"
+	"github.com/lockyc/plate/internal/cli"
+	"github.com/lockyc/plate/internal/cutout"
+	"github.com/lockyc/plate/internal/diff"
+	"github.com/lockyc/plate/internal/doctor"
+	"github.com/lockyc/plate/internal/fonts"
+	"github.com/lockyc/plate/internal/grade"
+	"github.com/lockyc/plate/internal/infill"
+	"github.com/lockyc/plate/internal/inpaint"
+	"github.com/lockyc/plate/internal/policy"
+	"github.com/lockyc/plate/internal/press"
+	"github.com/lockyc/plate/internal/qr"
+	"github.com/lockyc/plate/internal/render"
+	"github.com/lockyc/plate/internal/upscale"
 )
 
 type command struct {
@@ -32,14 +32,14 @@ type command struct {
 	summary string
 	main    func(ctx context.Context, args []string, stdout, stderr io.Writer) int
 	// synthesises: the command creates pixels the source never had, so
-	// imgkit.toml's synthesis policy is checked before it runs.
+	// plate.toml's synthesis policy is checked before it runs.
 	synthesises bool
 }
 
 // commands is the dispatch table and the usage text, in display order.
 var commands = []command{
-	{"version", "print the imgkit version", versionMain, false},
-	{"doctor", "check every engine; --install fetches the ones imgkit manages", doctor.Main, false},
+	{"version", "print the plate version", versionMain, false},
+	{"doctor", "check every engine; --install fetches the ones plate manages", doctor.Main, false},
 	{"render", "HTML to PNG and/or PDF with headless Chrome", render.Main, false},
 	{"press", "PDF to a print master: outlined text, CMYK, checked against a soft proof", press.Main, false},
 	{"diff", "compare two images after lining them up vertically", diff.Main, false},
@@ -64,7 +64,7 @@ func main() {
 
 func usage() string {
 	var b strings.Builder
-	b.WriteString("usage: imgkit <command> [flags] [args]\n\ncommands:\n")
+	b.WriteString("usage: plate <command> [flags] [args]\n\ncommands:\n")
 	for _, c := range commands {
 		s := c.summary
 		if c.synthesises {
@@ -72,7 +72,7 @@ func usage() string {
 		}
 		fmt.Fprintf(&b, "  %-10s %s\n", c.name, s)
 	}
-	b.WriteString("\nimgkit <command> -h prints a command's flags.\n")
+	b.WriteString("\nplate <command> -h prints a command's flags.\n")
 	return b.String()
 }
 
@@ -100,7 +100,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			return c.main(ctx, args[1:], stdout, stderr)
 		}
 	}
-	fmt.Fprintf(stderr, "imgkit: unknown command %q\n\n%s", args[0], usage())
+	fmt.Fprintf(stderr, "plate: unknown command %q\n\n%s", args[0], usage())
 	return 2
 }
 

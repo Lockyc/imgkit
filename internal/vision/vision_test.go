@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lockyc/imgkit/internal/engine"
-	"github.com/lockyc/imgkit/internal/enginetest"
+	"github.com/lockyc/plate/internal/engine"
+	"github.com/lockyc/plate/internal/enginetest"
 )
 
 func TestAvailable(t *testing.T) {
@@ -43,7 +43,7 @@ printf '#!/bin/sh\n' > "$2"; chmod +x "$2"`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	stale := filepath.Join(cache, "vision", hex.EncodeToString(sum[:])[:16], "imgkit-vision.tmp")
+	stale := filepath.Join(cache, "vision", hex.EncodeToString(sum[:])[:16], "plate-vision.tmp")
 	if err := os.MkdirAll(stale, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -94,21 +94,21 @@ printf '#!/bin/sh\ncp "$1" "$2"\n' > "$2"; chmod +x "$2"`)
 }
 
 // TestRealVision compiles the helper with the real swiftc and cuts a real
-// image. Opt-in (IMGKIT_REAL=1): it is not part of gate or CI.
+// image. Opt-in (PLATE_REAL=1): it is not part of gate or CI.
 func TestRealVision(t *testing.T) {
-	if os.Getenv("IMGKIT_REAL") == "" || runtime.GOOS != "darwin" {
-		t.Skip("set IMGKIT_REAL=1 on macOS")
+	if os.Getenv("PLATE_REAL") == "" || runtime.GOOS != "darwin" {
+		t.Skip("set PLATE_REAL=1 on macOS")
 	}
-	in := os.Getenv("IMGKIT_REAL_IN")
+	in := os.Getenv("PLATE_REAL_IN")
 	if in == "" {
-		t.Skip("set IMGKIT_REAL_IN to a PNG")
+		t.Skip("set PLATE_REAL_IN to a PNG")
 	}
 	out := filepath.Join(t.TempDir(), "out.png")
 	if err := Mask(context.Background(), in, out); err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("wrote %s", out)
-	if dst := os.Getenv("IMGKIT_REAL_OUT"); dst != "" {
+	if dst := os.Getenv("PLATE_REAL_OUT"); dst != "" {
 		b, _ := os.ReadFile(out)
 		os.WriteFile(dst, b, 0o644)
 	}

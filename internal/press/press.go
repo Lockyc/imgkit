@@ -23,10 +23,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lockyc/imgkit/internal/cli"
-	"github.com/lockyc/imgkit/internal/engine"
-	"github.com/lockyc/imgkit/internal/pdf"
-	"github.com/lockyc/imgkit/internal/raster"
+	"github.com/lockyc/plate/internal/cli"
+	"github.com/lockyc/plate/internal/engine"
+	"github.com/lockyc/plate/internal/pdf"
+	"github.com/lockyc/plate/internal/raster"
 )
 
 const usage = "press --icc profile.icc [--max-ppi N] [--max-rmse R] [--region x,y,w,h:max]... [--proof-width PX] <in.pdf> <out.pdf>"
@@ -63,7 +63,7 @@ type job struct {
 	log             io.Writer
 }
 
-// Main runs `imgkit press`.
+// Main runs `plate press`.
 func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fs := cli.Flags("press", usage, stderr)
 	icc := fs.String("icc", "", "the CMYK output profile (required)")
@@ -248,7 +248,7 @@ func (j job) verify(ctx context.Context, src pdf.Info) error {
 	if len(bad) > 0 {
 		return fmt.Errorf("non-CMYK image(s) in the master:\n%s", strings.Join(bad, "\n"))
 	}
-	tmp, err := os.MkdirTemp("", "imgkit-press-")
+	tmp, err := os.MkdirTemp("", "plate-press-")
 	if err != nil {
 		return err
 	}

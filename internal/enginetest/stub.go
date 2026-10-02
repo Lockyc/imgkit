@@ -1,5 +1,5 @@
 // Package enginetest stands in for external engines in tests: a POSIX sh
-// script that imgkit finds through the engine's override variable.
+// script that plate finds through the engine's override variable.
 package enginetest
 
 import (
@@ -9,10 +9,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/lockyc/imgkit/internal/engine"
+	"github.com/lockyc/plate/internal/engine"
 )
 
-// Stub makes a fake executable for engine name and points imgkit at it.
+// Stub makes a fake executable for engine name and points plate at it.
 // body is POSIX sh and sees the real arguments as "$@". Before body runs,
 // each invocation appends a record to the returned log: its argument count,
 // then each argument, every field NUL-terminated. Arguments cannot contain

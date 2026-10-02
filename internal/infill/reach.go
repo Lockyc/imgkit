@@ -7,7 +7,7 @@ import (
 	"math"
 	"path/filepath"
 
-	"github.com/lockyc/imgkit/internal/raster"
+	"github.com/lockyc/plate/internal/raster"
 )
 
 // Edge stops: the blur levels average everything within their reach, so a

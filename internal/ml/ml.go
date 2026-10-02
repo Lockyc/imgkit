@@ -1,4 +1,4 @@
-// Package ml runs imgkit's Python: embedded single-file scripts whose
+// Package ml runs plate's Python: embedded single-file scripts whose
 // dependencies are fixed by a committed `uv lock --script` lockfile and run
 // with --locked, and pinned upstream CLIs through `uv tool run`. uv is the
 // only Python tool a user installs. Python is here only because the matting,
@@ -17,8 +17,8 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/lockyc/imgkit/internal/engine"
-	"github.com/lockyc/imgkit/internal/pins"
+	"github.com/lockyc/plate/internal/engine"
+	"github.com/lockyc/plate/internal/pins"
 )
 
 //go:embed scripts
@@ -29,9 +29,9 @@ const Timeout = 2 * time.Hour
 
 // deviceModule is the device rule's file name, which the torch scripts
 // import from beside them.
-const deviceModule = "imgkit_device.py"
+const deviceModule = "plate_device.py"
 
-//go:embed imgkit_device.py
+//go:embed plate_device.py
 var deviceRule []byte
 
 // Script writes an embedded script, its lockfile and the device rule into

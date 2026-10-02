@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lockyc/imgkit/internal/raster"
+	"github.com/lockyc/plate/internal/raster"
 )
 
 // dropped runs edgeStops and returns which known pixels it cut off, as a

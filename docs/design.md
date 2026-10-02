@@ -6,9 +6,9 @@ links:
     note: the order the pieces below get built in
 ---
 
-# imgkit — design
+# plate — design
 
-The architecture imgkit is built to; [roadmap.md](roadmap.md) tracks what is
+The architecture plate is built to; [roadmap.md](roadmap.md) tracks what is
 built and what comes next.
 
 ## Shape
@@ -16,7 +16,7 @@ built and what comes next.
 One Go binary, `go install`-able. Each subcommand is one generic operation;
 nothing project-specific (crop boxes, paths, colours, thresholds tuned to one
 image) lives here. A project keeps a short recipe that supplies those and
-calls imgkit. Plain resize, crop and encode stay as `magick` calls in the
+calls plate. Plain resize, crop and encode stay as `magick` calls in the
 recipe, because wrapping them would add nothing.
 
 ```
@@ -32,7 +32,7 @@ internal/imgsize/    image dimensions without decoding pixels
 internal/enginetest/ sh stubs that stand in for engines in tests
 internal/pins/       the one table of engine versions
 internal/pdf/        PDF page count, page boxes and text through poppler
-internal/policy/     the imgkit.toml synthesis policy
+internal/policy/     the plate.toml synthesis policy
 internal/raster/     in-process pixel work: load, measure, small PNG edits
 internal/ml/         embedded single-file Python scripts (uv run --script)
 internal/vision/     embedded Swift helper for Apple Vision (macOS)
@@ -53,13 +53,13 @@ quality/             the test images, their licences, and cases.toml
 reads it, and so does every "not installed" error, which prints the exact
 install command.
 
-`IMGKIT_ENGINE_<NAME>` points imgkit at a specific executable for an engine,
+`PLATE_ENGINE_<NAME>` points plate at a specific executable for an engine,
 ahead of the data directory and `PATH`; tests use it to stand in sh stubs.
 
 | Engine | How it is pinned |
 |---|---|
 | ImageMagick 7 | minimum version |
-| chrome-headless-shell | exact version and sha256, installed by `doctor --install` under `$XDG_DATA_HOME/imgkit/` |
+| chrome-headless-shell | exact version and sha256, installed by `doctor --install` under `$XDG_DATA_HOME/plate/` |
 | Ghostscript, poppler, qpdf, qrencode | minimum version |
 | Apple Vision | the OS; macOS 14 or later, plus `swiftc` as a minimum-version engine |
 | Python ML scripts (ViTMatte, BiRefNet, DAT, grade fit) | PEP 723 header with `exclude-newer`, and a committed `uv lock --script` lockfile run with `--locked`; ViTMatte and DAT weights pinned by Hugging Face commit in `internal/pins`, BiRefNet's by the pinned `rembg` version |
@@ -68,8 +68,8 @@ ahead of the data directory and `PATH`; tests use it to stand in sh stubs.
 Python runs only for the ML steps, where no Go, Rust or shell tool of
 comparable quality exists. `uv` is the only Python tool a user installs.
 
-Every torch model runs on the device `internal/ml/imgkit_device.py` picks,
-which `$IMGKIT_DEVICE` overrides. The scripts import it; for LaMa, imgkit
+Every torch model runs on the device `internal/ml/plate_device.py` picks,
+which `$PLATE_DEVICE` overrides. The scripts import it; for LaMa, plate
 runs it under iopaint's torch and passes the answer as iopaint's `--device`
 (cpu, cuda or mps), and iopaint runs LaMa on the CPU when given mps.
 BiRefNet runs on rembg's CPU build.
@@ -77,7 +77,7 @@ BiRefNet runs on rembg's CPU build.
 ## Synthesis policy
 
 `inpaint`, `infill` and `upscale` create pixels the camera or artist never
-made. imgkit looks for `imgkit.toml` in the working directory and each parent;
+made. plate looks for `plate.toml` in the working directory and each parent;
 if the nearest one sets `synthesis = "forbid"`, those commands exit with an
 error naming the file. Everything else only computes an alpha channel, moves
 colours, or renders what it is given.
@@ -134,7 +134,7 @@ or later, and Linux with glibc 2.28 or later on x86_64 or arm64. On Linux,
 everything works except `--coarse vision`, which exits with a message pointing
 at `birefnet`; on arm64, Chrome for Testing publishes no
 chrome-headless-shell, so `render` runs only with one supplied through
-`IMGKIT_ENGINE_CHROME_HEADLESS_SHELL`. On an Intel Mac, `ml.RunScript` refuses
+`PLATE_ENGINE_CHROME_HEADLESS_SHELL`. On an Intel Mac, `ml.RunScript` refuses
 a script whose lockfile holds a package built for Apple Silicon only (PyTorch,
 ONNX Runtime), so `cutout` and `upscale` refuse before uv runs; `grade fit`
 needs macOS 14 or later there, and `inpaint`, whose iopaint resolves its own
@@ -146,7 +146,7 @@ whole"), and never leaves a plausible-looking wrong file behind.
 ## Quality
 
 `go test ./...` covers everything that needs no model or browser, standing
-sh stubs in for engines through `IMGKIT_ENGINE_<NAME>`. `just quality` runs
+sh stubs in for engines through `PLATE_ENGINE_<NAME>`. `just quality` runs
 the quality cases over `quality/`: openly licensed or synthetic test images,
 each asset registered in `quality/assets.toml` with its source and licence,
 each case in `quality/cases.toml` (fields: `quality.Case`) with its metric

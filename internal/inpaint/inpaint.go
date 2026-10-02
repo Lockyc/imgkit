@@ -1,5 +1,5 @@
 // Package inpaint fills a masked region with LaMa (iopaint). It synthesises
-// pixels, so imgkit.toml can forbid it. LaMa needs the same kind of texture
+// pixels, so plate.toml can forbid it. LaMa needs the same kind of texture
 // around a hole: next to a large flat area it fills flat grey. A hole in a
 // flat ground is infill's job.
 package inpaint
@@ -12,17 +12,17 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/lockyc/imgkit/internal/cli"
-	"github.com/lockyc/imgkit/internal/engine"
-	"github.com/lockyc/imgkit/internal/frame"
-	"github.com/lockyc/imgkit/internal/imgsize"
-	"github.com/lockyc/imgkit/internal/ml"
-	"github.com/lockyc/imgkit/internal/pins"
+	"github.com/lockyc/plate/internal/cli"
+	"github.com/lockyc/plate/internal/engine"
+	"github.com/lockyc/plate/internal/frame"
+	"github.com/lockyc/plate/internal/imgsize"
+	"github.com/lockyc/plate/internal/ml"
+	"github.com/lockyc/plate/internal/pins"
 )
 
 const usage = "inpaint --mask mask.png <in> <out.png>"
 
-// Main runs `imgkit inpaint`.
+// Main runs `plate inpaint`.
 func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	fs := cli.Flags("inpaint", usage, stderr)
 	mask := fs.String("mask", "", "white where LaMa fills, same size as the image (required)")
@@ -47,7 +47,7 @@ func run(ctx context.Context, in, mask, out string) error {
 	if engine.SameFile(in, out) || engine.SameFile(mask, out) {
 		return fmt.Errorf("%s is also an input; write the result elsewhere", out)
 	}
-	tmp, err := os.MkdirTemp("", "imgkit-inpaint-")
+	tmp, err := os.MkdirTemp("", "plate-inpaint-")
 	if err != nil {
 		return err
 	}

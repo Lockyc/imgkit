@@ -1,6 +1,6 @@
-// imgkit's Vision helper: `imgkit-vision <in.png> <out.png>` writes the
+// plate's Vision helper: `plate-vision <in.png> <out.png>` writes the
 // image with every foreground instance kept and the rest transparent, at the
-// input's size. imgkit reads its alpha as the coarse mask. The mask is
+// input's size. plate reads its alpha as the coarse mask. The mask is
 // segmentation only: about 96% of it is hard 0 or 255 with a 2 px
 // transition and no hair, so it is a prior for ViTMatte, never a result.
 
@@ -8,12 +8,12 @@ import AppKit
 import Vision
 
 func die(_ message: String) -> Never {
-  FileHandle.standardError.write("imgkit-vision: \(message)\n".data(using: .utf8)!)
+  FileHandle.standardError.write("plate-vision: \(message)\n".data(using: .utf8)!)
   exit(1)
 }
 
 let args = CommandLine.arguments
-guard args.count == 3 else { die("usage: imgkit-vision <in.png> <out.png>") }
+guard args.count == 3 else { die("usage: plate-vision <in.png> <out.png>") }
 let handler = VNImageRequestHandler(url: URL(fileURLWithPath: args[1]), options: [:])
 let request = VNGenerateForegroundInstanceMaskRequest()
 do { try handler.perform([request]) } catch { die("Vision request failed: \(error.localizedDescription)") }

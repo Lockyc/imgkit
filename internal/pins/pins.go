@@ -1,6 +1,6 @@
 // Package pins is the one table of engine versions. doctor, every "not
 // installed" error and the managed installer read it; no engine version is
-// written anywhere else in imgkit.
+// written anywhere else in plate.
 package pins
 
 import (
@@ -16,23 +16,23 @@ type Kind int
 const (
 	// Minimum engines are found on PATH at or above Min.
 	Minimum Kind = iota
-	// Managed engines are downloaded by `imgkit doctor --install` at exactly
+	// Managed engines are downloaded by `plate doctor --install` at exactly
 	// Download.Version into the data directory.
 	Managed
 )
 
-// Engine is one external tool imgkit runs. For Minimum engines Name is also
+// Engine is one external tool plate runs. For Minimum engines Name is also
 // the executable looked up on PATH.
 type Engine struct {
 	Name        string
 	Kind        Kind
 	VersionArgs []string          // Minimum: arguments that make it print its version
 	VersionRe   string            // Minimum: the first group captures the version
-	Min         string            // Minimum: the lowest version imgkit accepts
+	Min         string            // Minimum: the lowest version plate accepts
 	Install     map[string]string // Minimum: GOOS -> the command a person runs
 	Download    *Download         // Managed
 	GOOS        []string          // platforms it exists on; nil means every platform
-	UsedBy      []string          // the imgkit commands that need it
+	UsedBy      []string          // the plate commands that need it
 }
 
 // Download is a managed engine's pinned release.
@@ -66,7 +66,7 @@ func poppler(name string, usedBy ...string) Engine {
 	}
 }
 
-// Engines is every external tool imgkit runs.
+// Engines is every external tool plate runs.
 var Engines = []Engine{
 	{
 		Name: "magick", Kind: Minimum,
@@ -162,7 +162,7 @@ func (e Engine) Hint() string {
 		if _, ok := e.Asset(); !ok {
 			return "no build for this platform"
 		}
-		return "run `imgkit doctor --install`"
+		return "run `plate doctor --install`"
 	}
 	if c := e.Install[runtime.GOOS]; c != "" {
 		return c

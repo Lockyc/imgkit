@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lockyc/imgkit/internal/enginetest"
-	"github.com/lockyc/imgkit/internal/raster"
+	"github.com/lockyc/plate/internal/enginetest"
+	"github.com/lockyc/plate/internal/raster"
 )
 
 const chromeStub = `for a in "$@"; do

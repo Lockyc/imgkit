@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lockyc/imgkit/internal/enginetest"
-	"github.com/lockyc/imgkit/internal/pins"
+	"github.com/lockyc/plate/internal/enginetest"
+	"github.com/lockyc/plate/internal/pins"
 )
 
 func TestEveryScriptIsLockedAndDated(t *testing.T) {
@@ -144,7 +144,7 @@ func TestScriptsShareTheDeviceRule(t *testing.T) {
 			t.Errorf("%s: device rule not beside it: %v", n, err)
 		}
 		src, _ := scripts.ReadFile(n)
-		if strings.Contains(string(src), "import torch") != strings.Contains(string(src), "from imgkit_device import pick") {
+		if strings.Contains(string(src), "import torch") != strings.Contains(string(src), "from plate_device import pick") {
 			t.Errorf("%s imports torch but not the device rule, or the reverse", n)
 		}
 		if strings.Contains(string(src), ".is_available()") {
@@ -175,20 +175,20 @@ func TestToolDevice(t *testing.T) {
 }
 
 // TestDeviceRule runs the rule under the scripts' own torch. Opt-in
-// (IMGKIT_REAL=1): it resolves torch.
+// (PLATE_REAL=1): it resolves torch.
 func TestDeviceRule(t *testing.T) {
-	if os.Getenv("IMGKIT_REAL") == "" {
-		t.Skip("set IMGKIT_REAL=1")
+	if os.Getenv("PLATE_REAL") == "" {
+		t.Skip("set PLATE_REAL=1")
 	}
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	tool := pins.IOPaint
-	t.Setenv("IMGKIT_DEVICE", "cpu")
+	t.Setenv("PLATE_DEVICE", "cpu")
 	if d, err := ToolDevice(context.Background(), tool); err != nil || d != "cpu" {
-		t.Errorf("IMGKIT_DEVICE=cpu: %q, %v", d, err)
+		t.Errorf("PLATE_DEVICE=cpu: %q, %v", d, err)
 	}
-	t.Setenv("IMGKIT_DEVICE", "tpu")
-	if _, err := ToolDevice(context.Background(), tool); err == nil || !strings.Contains(err.Error(), "IMGKIT_DEVICE") {
-		t.Errorf("IMGKIT_DEVICE=tpu accepted: %v", err)
+	t.Setenv("PLATE_DEVICE", "tpu")
+	if _, err := ToolDevice(context.Background(), tool); err == nil || !strings.Contains(err.Error(), "PLATE_DEVICE") {
+		t.Errorf("PLATE_DEVICE=tpu accepted: %v", err)
 	}
 }
 
@@ -210,7 +210,7 @@ func TestIntelMacBlockers(t *testing.T) {
 	}
 }
 
-// TestIntelMac: an amd64 imgkit under Rosetta runs on Apple Silicon, where
+// TestIntelMac: an amd64 plate under Rosetta runs on Apple Silicon, where
 // uv installs the arm64 wheels, so only an untranslated one is an Intel Mac.
 func TestIntelMac(t *testing.T) {
 	for _, c := range []struct {

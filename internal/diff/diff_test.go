@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lockyc/imgkit/internal/raster"
+	"github.com/lockyc/plate/internal/raster"
 )
 
 func noise(w, h int, seed uint64) *image.RGBA64 {

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lockyc/imgkit/internal/enginetest"
-	"github.com/lockyc/imgkit/internal/raster"
+	"github.com/lockyc/plate/internal/enginetest"
+	"github.com/lockyc/plate/internal/raster"
 )
 
 func pngOf(t *testing.T, dir, name string, w, h int) string {

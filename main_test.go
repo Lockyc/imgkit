@@ -15,9 +15,9 @@ func TestRun(t *testing.T) {
 		inStdout string
 		inStderr string
 	}{
-		{nil, 2, "", "usage: imgkit"},
+		{nil, 2, "", "usage: plate"},
 		{[]string{"version"}, 0, version, ""},
-		{[]string{"help"}, 0, "usage: imgkit", ""},
+		{[]string{"help"}, 0, "usage: plate", ""},
 		{[]string{"help"}, 0, "version", ""},
 		{[]string{"nope"}, 2, "", `unknown command "nope"`},
 	}
@@ -46,7 +46,7 @@ func TestEveryCommandIsInUsage(t *testing.T) {
 
 func TestSynthesisPolicy(t *testing.T) {
 	t.Chdir(t.TempDir())
-	os.WriteFile("imgkit.toml", []byte(`synthesis = "forbid"`), 0o644)
+	os.WriteFile("plate.toml", []byte(`synthesis = "forbid"`), 0o644)
 	for _, c := range commands {
 		var out, errb bytes.Buffer
 		code := run(context.Background(), []string{c.name, "-h"}, &out, &errb)

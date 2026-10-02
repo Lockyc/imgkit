@@ -1,4 +1,4 @@
-// Package pdf reads what imgkit needs from a PDF through poppler: page
+// Package pdf reads what plate needs from a PDF through poppler: page
 // count, page boxes and text.
 package pdf
 
@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/lockyc/imgkit/internal/engine"
+	"github.com/lockyc/plate/internal/engine"
 )
 
 // Info is a PDF's page count and page 1's box, in points.

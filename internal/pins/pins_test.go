@@ -79,7 +79,7 @@ func TestTableIsWellFormed(t *testing.T) {
 func TestHint(t *testing.T) {
 	here := runtime.GOOS + "/" + runtime.GOARCH
 	m := Engine{Name: "x", Kind: Managed, Download: &Download{Version: "1", Assets: map[string]Asset{here: {}}}}
-	if got := m.Hint(); got != "run `imgkit doctor --install`" {
+	if got := m.Hint(); got != "run `plate doctor --install`" {
 		t.Errorf("managed hint = %q", got)
 	}
 	m.Download.Assets = nil

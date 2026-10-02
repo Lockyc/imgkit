@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/lockyc/imgkit/internal/engine"
+	"github.com/lockyc/plate/internal/engine"
 )
 
 func TestSRGB(t *testing.T) {

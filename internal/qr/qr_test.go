@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lockyc/imgkit/internal/enginetest"
+	"github.com/lockyc/plate/internal/enginetest"
 )
 
 func TestQR(t *testing.T) {

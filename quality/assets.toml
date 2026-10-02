@@ -1,7 +1,7 @@
 # Every file in quality/assets/, with where it came from and its licence.
 # registry_test.go fails when a file is missing from this list, a listed
 # file is missing, or a sha256 differs. `source` is a URL, or "synthetic"
-# for files made for imgkit (then `recipe` says how).
+# for files made for plate (then `recipe` says how).
 
 [[asset]]
 file    = "Coated_Fogra39L_VIGC_300.icc"
@@ -23,7 +23,7 @@ file    = "portrait-ivy.jpg"
 source  = "https://commons.wikimedia.org/wiki/File:Portrait-glamour.jpg"
 author  = "Jean-Christophe Destailleur"
 licence = "CC BY-SA 3.0"
-recipe  = "cropped by imgkit: magick SOURCE -crop 2400x2206+0+0 +repage -quality 90 -strip portrait-ivy.jpg"
+recipe  = "cropped by plate: magick SOURCE -crop 2400x2206+0+0 +repage -quality 90 -strip portrait-ivy.jpg"
 sha256  = "6213bca08d5d4e9470c2fd72eaf31ca54d40d1f9a04c4ff28dcb66bae54560d8"
 
 [[asset]]
@@ -31,7 +31,7 @@ file    = "fur-matching-ground.jpg"
 source  = "https://commons.wikimedia.org/wiki/File:Renard_polaire_DSCF2606.jpg"
 author  = "Musicaline"
 licence = "CC BY-SA 4.0"
-recipe  = "resized by imgkit: magick SOURCE -resize 1600x1600 -quality 92 -strip fur-matching-ground.jpg"
+recipe  = "resized by plate: magick SOURCE -resize 1600x1600 -quality 92 -strip fur-matching-ground.jpg"
 sha256  = "347f465e2a2add4afde3776647519042cb6d04f14f23a398391d2fe2ac906ba3"
 
 [[asset]]
@@ -47,7 +47,7 @@ file    = "detail-photo.jpg"
 source  = "https://commons.wikimedia.org/wiki/File:Coulored_coth_with_embroidery,_detail,_Crafts_Museum,_Delhi.jpg"
 author  = "Yann (User:Yann on Wikimedia Commons)"
 licence = "CC BY-SA 4.0"
-recipe  = "resized by imgkit: magick SOURCE -resize 2000x2000 -quality 90 -strip detail-photo.jpg"
+recipe  = "resized by plate: magick SOURCE -resize 2000x2000 -quality 90 -strip detail-photo.jpg"
 sha256  = "d46e69b1e4e63bffdf15e7dad7735b89061159d1642e3531271860d6b54a4b4e"
 
 [[asset]]
@@ -56,7 +56,7 @@ file    = "paper-ground.jpg"
 source  = "https://commons.wikimedia.org/wiki/File:Blank_page,_brown_paper_texture_(14802136533).jpg"
 author  = "Internet Archive Book Images (a blank page of Armide, Henry Lemoine & Cie, Paris)"
 licence = "Public domain"
-recipe  = "cropped by imgkit: magick SOURCE -crop 1600x1600+574+1150 +repage -quality 92 -strip paper-ground.jpg"
+recipe  = "cropped by plate: magick SOURCE -crop 1600x1600+574+1150 +repage -quality 92 -strip paper-ground.jpg"
 sha256  = "510673fce871af1b7c8c8ca61aa4423c37ea5aa79baec0b8ff9d08b3305ea122"
 
 [[asset]]
@@ -64,7 +64,7 @@ file    = "sky-ground.jpg"
 source  = "https://commons.wikimedia.org/wiki/File:Clear_blue_sky_(4-12-2026).jpg"
 author  = "SpongeLover08"
 licence = "CC0"
-recipe  = "resized and cropped by imgkit: magick SOURCE -resize 50% -crop 1500x1500+18+540 +repage -quality 92 -strip sky-ground.jpg"
+recipe  = "resized and cropped by plate: magick SOURCE -resize 50% -crop 1500x1500+18+540 +repage -quality 92 -strip sky-ground.jpg"
 sha256  = "7cee9175cb1e874c4232a513cfa429738b845b07c97f24384a8d261659437b8b"
 
 [[asset]]
@@ -72,7 +72,7 @@ file    = "illustration.jpg"
 source  = "https://commons.wikimedia.org/wiki/File:2024-09-01_Pepper_and_Carrot_in_traditional_clothing_of_Bergen_by_David_Revoy.jpg"
 author  = "David Revoy"
 licence = "CC BY 4.0"
-recipe  = "resized by imgkit: magick SOURCE -resize 2000x2000 -quality 92 -strip illustration.jpg"
+recipe  = "resized by plate: magick SOURCE -resize 2000x2000 -quality 92 -strip illustration.jpg"
 sha256  = "70c2c1542845343e5847779d9f7f340b093849c9e2693b469ce9b7073bf11d91"
 
 [[asset]]

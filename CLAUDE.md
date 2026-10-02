@@ -12,17 +12,19 @@ links:
     note: start here for what's next
 ---
 
-# imgkit — notes for the next agent
+# plate — notes for the next agent
 
-A Go CLI of generic image and render operations for print and web pipelines.
+A Go CLI that makes or inspects a visual artefact from the shell: rasters,
+rendered pages, PDFs, for print and web pipelines. Generic operations only;
+a consuming project's look or values come in as flags.
 The command set is in [README.md](README.md), the architecture in
 [docs/design.md](docs/design.md), and **what is built and what comes next in
 [docs/roadmap.md](docs/roadmap.md)**.
 
-## When imgkit falls short, improve imgkit
+## When plate falls short, improve plate
 
 This is the rule the repo exists for. If an operation does not give a result
-good enough for the job, the fix goes into imgkit: a new engine, flag or
+good enough for the job, the fix goes into plate: a new engine, flag or
 preset. Work it in this order:
 
 1. Add a `quality/` case that reproduces the shortfall, with its metric.
@@ -31,7 +33,7 @@ preset. Work it in this order:
 
 Thresholds in `quality/cases.toml` only ever get stricter. Declaring a result
 impossible after one attempt, or hand-patching a consuming project's recipe
-around imgkit, is the failure this rule exists to stop.
+around plate, is the failure this rule exists to stop.
 
 ## Conventions
 
@@ -44,10 +46,10 @@ around imgkit, is the failure this rule exists to stop.
 - **Python only for ML**, as embedded PEP 723 scripts with `exclude-newer`
   and a committed lockfile run `--locked`, model revisions pinned in
   `internal/pins`; upstream CLIs (LaMa) through `uv tool run`.
-- **Portable.** No GNU-only or BSD-only flags in anything imgkit runs.
+- **Portable.** No GNU-only or BSD-only flags in anything plate runs.
 - **Mark synthesis.** A command that creates pixels the source never had
   sets `synthesises` in main.go's command table, which applies the
-  `imgkit.toml` policy (docs/design.md → Synthesis policy).
+  `plate.toml` policy (docs/design.md → Synthesis policy).
 - **Public repo, self-contained tree.** No machine paths, no private
   hostnames, no consuming project's assets. `quality/` holds only openly
   licensed or synthetic images, each with its source and licence recorded.

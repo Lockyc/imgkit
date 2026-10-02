@@ -1,4 +1,4 @@
-// Package icc carries the colour profile imgkit converts images to before
+// Package icc carries the colour profile plate converts images to before
 // it strips their metadata: the ICC's sRGB2014 (licence beside it).
 package icc
 
@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/lockyc/imgkit/internal/engine"
+	"github.com/lockyc/plate/internal/engine"
 )
 
 //go:embed sRGB2014.icc

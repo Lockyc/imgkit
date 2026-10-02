@@ -12,9 +12,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lockyc/imgkit/internal/enginetest"
-	"github.com/lockyc/imgkit/internal/pins"
-	"github.com/lockyc/imgkit/internal/raster"
+	"github.com/lockyc/plate/internal/enginetest"
+	"github.com/lockyc/plate/internal/pins"
+	"github.com/lockyc/plate/internal/raster"
 )
 
 // magick: `-format %wx%h info:` prints $SRC_DIMS; any other call copies

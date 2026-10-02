@@ -1,6 +1,6 @@
-// Package policy reads imgkit.toml. Its one setting is synthesis: "forbid"
+// Package policy reads plate.toml. Its one setting is synthesis: "forbid"
 // makes every command that creates pixels the source never had refuse to
-// run. The nearest imgkit.toml, from the working directory upward, decides;
+// run. The nearest plate.toml, from the working directory upward, decides;
 // a malformed one is an error, never a silent allow.
 package policy
 
@@ -16,7 +16,7 @@ import (
 )
 
 // File is the policy file's name.
-const File = "imgkit.toml"
+const File = "plate.toml"
 
 // ForbiddenError is a synthesising command refused by policy.
 type ForbiddenError struct{ Path, Op string }
@@ -29,7 +29,7 @@ type config struct {
 	Synthesis string `toml:"synthesis"`
 }
 
-// CheckSynthesis applies the nearest imgkit.toml at or above dir to op.
+// CheckSynthesis applies the nearest plate.toml at or above dir to op.
 func CheckSynthesis(dir, op string) error {
 	path, err := find(dir)
 	if err != nil || path == "" {

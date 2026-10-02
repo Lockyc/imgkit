@@ -8,7 +8,7 @@
 
     upscale.py --image frame.png --out out.png --model REPO --revision SHA --file WEIGHTS
 
-The image is imgkit's normalised frame: oriented, sRGB, 8-bit RGBA. DAT is
+The image is plate's normalised frame: oriented, sRGB, 8-bit RGBA. DAT is
 trained for fidelity to the original, so it sharpens the edges and strokes
 that survive in the small image and invents no texture.
 
@@ -30,7 +30,7 @@ import time
 import numpy as np
 import torch
 from huggingface_hub import hf_hub_download
-from imgkit_device import pick
+from plate_device import pick
 from PIL import Image
 from spandrel import ModelLoader
 
