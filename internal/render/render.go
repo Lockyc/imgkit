@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/color"
 	_ "image/png"
 	"io"
 	"io/fs"
@@ -27,7 +28,7 @@ import (
 	"github.com/lockyc/plate/internal/raster"
 )
 
-const usage = "render [--png out.png] [--pdf out.pdf] [--html out.html] [--size WxH] [--scale S] [--budget MS] [--fail-if TEXT]... <page.html|URL>"
+const usage = "render [--png out.png [--transparent]] [--pdf out.pdf] [--html out.html] [--size WxH] [--scale S] [--budget MS] [--fail-if TEXT]... <page.html|URL>"
 
 const chrome = "chrome-headless-shell"
 
@@ -54,14 +55,15 @@ func (m *multi) String() string     { return strings.Join(*m, ", ") }
 func (m *multi) Set(s string) error { *m = append(*m, s); return nil }
 
 type job struct {
-	url, local string
-	png, pdf   string
-	html       string
-	w, h       int
-	scale      float64
-	budget     int
-	failIf     []string
-	warn       io.Writer
+	url, local  string
+	png, pdf    string
+	html        string
+	transparent bool
+	w, h        int
+	scale       float64
+	budget      int
+	failIf      []string
+	warn        io.Writer
 }
 
 // Main runs `plate render`.
@@ -70,6 +72,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	pngOut := fs.String("png", "", "write a PNG screenshot here")
 	pdfOut := fs.String("pdf", "", "write a PDF here")
 	htmlOut := fs.String("html", "", "write the page's DOM here once scripts settle (a static copy with every script's work done)")
+	transparent := fs.Bool("transparent", false, "give the PNG an alpha channel, with the page's transparent areas left transparent rather than white")
 	size := fs.String("size", "", "viewport and expected page size in CSS px, WxH (required with --png)")
 	scale := cli.Float(fs, "scale", 1, "device scale factor; the PNG is size × scale px at 96 × scale dpi")
 	budget := cli.Int(fs, "budget", defaultBudget, "virtual-time budget in ms for scripts, fonts and images to settle")
@@ -79,13 +82,16 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if !ok {
 		return code
 	}
-	j := job{png: *pngOut, pdf: *pdfOut, html: *htmlOut, scale: *scale, budget: *budget, failIf: failIf, warn: stderr}
+	j := job{png: *pngOut, pdf: *pdfOut, html: *htmlOut, transparent: *transparent, scale: *scale, budget: *budget, failIf: failIf, warn: stderr}
 	usageErr := func(msg string) int {
 		defer fs.Usage()
 		return cli.Usage(stderr, "render", "%s", msg)
 	}
 	if j.png == "" && j.pdf == "" && j.html == "" {
 		return usageErr("give --png, --pdf, --html or a combination")
+	}
+	if j.transparent && j.png == "" {
+		return usageErr("--transparent needs --png")
 	}
 	if *size != "" {
 		w, h, err := parseSize(*size)
@@ -234,6 +240,11 @@ func (j job) screenshot(ctx context.Context) error {
 		"--force-device-scale-factor="+strconv.FormatFloat(j.scale, 'f', -1, 64),
 		fmt.Sprintf("--window-size=%d,%d", j.w, j.h),
 		"--screenshot="+j.png)
+	if j.transparent {
+		// Chrome paints an opaque white ground under the page unless its
+		// default background is itself transparent.
+		args = append(args, "--default-background-color=00000000")
+	}
 	if len(j.failIf) > 0 {
 		// The DOM comes from the same page load the screenshot shows.
 		args = append(args, "--dump-dom")
@@ -256,6 +267,9 @@ func (j job) screenshot(ctx context.Context) error {
 	}
 	if cfg.Width != pw || cfg.Height != ph {
 		return fmt.Errorf("Chrome rendered %dx%d, expected %dx%d (size × scale)", cfg.Width, cfg.Height, pw, ph)
+	}
+	if j.transparent && cfg.ColorModel != color.NRGBAModel && cfg.ColorModel != color.NRGBA64Model {
+		return fmt.Errorf("Chrome wrote a PNG without an alpha channel for --transparent")
 	}
 	// Chrome writes no pHYs, so the PNG would claim 72 dpi and misstate its
 	// print size. A CSS px is 1/96 in, so the true density is 96 × scale.

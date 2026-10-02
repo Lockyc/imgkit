@@ -322,3 +322,63 @@ func TestHTMLFailIf(t *testing.T) {
 		t.Error("page with a sentinel left on disk")
 	}
 }
+
+func TestRenderTransparent(t *testing.T) {
+	e := setup(t, 200, 100)
+	if code := e.run("--size", "100x50", "--scale", "2", "--transparent", "--png", e.out("p.png"), e.page); code != 0 {
+		t.Fatalf("code %d: %s", code, e.stderr.String())
+	}
+	calls := enginetest.Calls(t, e.chrome)
+	if len(calls) != 1 || !slices.Contains(calls[0], "--default-background-color=00000000") {
+		t.Fatalf("chrome calls %q, want one with a transparent default background", calls)
+	}
+}
+
+func TestRenderOpaqueByDefault(t *testing.T) {
+	e := setup(t, 200, 100)
+	if code := e.run("--size", "100x50", "--scale", "2", "--png", e.out("p.png"), e.page); code != 0 {
+		t.Fatalf("code %d: %s", code, e.stderr.String())
+	}
+	for _, a := range enginetest.Calls(t, e.chrome)[0] {
+		if strings.HasPrefix(a, "--default-background-color") {
+			t.Errorf("chrome given %s without --transparent", a)
+		}
+	}
+}
+
+func TestRenderTransparentRefusesOpaqueResult(t *testing.T) {
+	e := setup(t, 200, 100)
+	p := filepath.Join(t.TempDir(), "opaque.png")
+	f, _ := os.Create(p)
+	img := image.NewRGBA(image.Rect(0, 0, 200, 100))
+	for i := 3; i < len(img.Pix); i += 4 {
+		img.Pix[i] = 255
+	}
+	png.Encode(f, img)
+	f.Close()
+	t.Setenv("FIXTURE_PNG", p)
+	if code := e.run("--size", "100x50", "--scale", "2", "--transparent", "--png", e.out("p.png"), e.page); code != 1 {
+		t.Fatalf("code %d, want 1", code)
+	}
+	if !strings.Contains(e.stderr.String(), "alpha") || exists(e.out("p.png")) {
+		t.Errorf("stderr %q, file left: %v", e.stderr.String(), exists(e.out("p.png")))
+	}
+}
+
+func TestRenderTransparentNeedsPNG(t *testing.T) {
+	e := setup(t, 1, 1)
+	for _, args := range [][]string{
+		{"--transparent", "--pdf", e.out("p.pdf"), e.page},
+		{"--transparent", "--html", e.out("p.html"), e.page},
+	} {
+		if code := e.run(args...); code != 2 {
+			t.Errorf("%q: code %d, want 2", args, code)
+		}
+	}
+	if !strings.Contains(e.stderr.String(), "--transparent") {
+		t.Errorf("stderr %q", e.stderr.String())
+	}
+	if len(enginetest.Calls(t, e.chrome)) != 0 {
+		t.Error("chrome ran")
+	}
+}
