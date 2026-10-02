@@ -1,0 +1,161 @@
+/* plate doc — the default document look.
+ *
+ * `plate doc` links it at the TOP of the page's <head>, ahead of the document's own
+ * styles, so an HTML file that brings its own CSS keeps its look and this only supplies
+ * what the file didn't say (page setup, type, table rules). Markdown arrives with
+ * pandoc's default look switched off, so there this sheet is the whole look.
+ *
+ * `plate doc --css FILE` replaces it. */
+
+@page {
+	size: A4;
+	margin: 22mm 20mm 20mm;
+	@top-center {
+		content: var(--doc-title, "");
+		font-size: 8pt;
+		color: #666;
+		letter-spacing: 0.04em;
+	}
+	@bottom-center {
+		content: counter(page) " / " counter(pages);
+		font-size: 8pt;
+		color: #666;
+	}
+}
+
+html {
+	font-size: 11pt;
+}
+
+body {
+	font-family: Charter, Georgia, "Times New Roman", serif;
+	line-height: 1.5;
+	color: #1a1a1a;
+}
+
+h1,
+h2,
+h3,
+h4 {
+	font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+	line-height: 1.25;
+	break-after: avoid;
+}
+
+/* --doc-title (the running header) is set by `plate doc` from the first h1. */
+h1 {
+	font-size: 1.9rem;
+	margin: 0 0 1rem;
+}
+
+h2 {
+	font-size: 1.35rem;
+	margin: 1.6rem 0 0.6rem;
+	padding-bottom: 0.2rem;
+	border-bottom: 1px solid #ddd;
+}
+
+h3 {
+	font-size: 1.1rem;
+	margin: 1.2rem 0 0.4rem;
+}
+
+p {
+	margin: 0 0 0.7rem;
+	orphans: 3;
+	widows: 3;
+}
+
+ul,
+ol {
+	margin: 0 0 0.7rem;
+	padding-left: 1.4rem;
+}
+
+li {
+	margin-bottom: 0.2rem;
+}
+
+/* Pandoc emits tables with no borders at all — a bordered table is the single biggest
+ * difference between "printed web page" and "document", and an unstyled one extracts as
+ * an unreadable run-together. Rows avoid splitting; the whole table may still break, and
+ * the header repeats when it does. */
+table {
+	width: 100%;
+	margin: 1rem 0;
+	border-collapse: collapse;
+	font-size: 0.92rem;
+}
+
+thead {
+	display: table-header-group;
+}
+
+tr,
+figure {
+	break-inside: avoid;
+}
+
+th,
+td {
+	padding: 0.35rem 0.55rem;
+	border: 1px solid #bbb;
+	text-align: left;
+	vertical-align: top;
+}
+
+thead th {
+	background: #f2f2f2;
+	font-weight: 600;
+}
+
+code,
+pre {
+	font-family: "SF Mono", Menlo, Consolas, monospace;
+	font-size: 0.88rem;
+}
+
+code {
+	padding: 0.1rem 0.25rem;
+	background: #f4f4f4;
+	border-radius: 2px;
+}
+
+/* pre-wrap, not a scroll box: there is no scrolling on paper, and an over-wide line
+ * would otherwise be clipped off the page edge. No break-inside guard — a code block
+ * longer than a page must be allowed to break, or it overflows instead. */
+pre {
+	padding: 0.6rem 0.8rem;
+	background: #f7f7f7;
+	border: 1px solid #e2e2e2;
+	border-left: 3px solid #999;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre code {
+	padding: 0;
+	background: none;
+}
+
+blockquote {
+	margin: 1rem 0;
+	padding-left: 0.9rem;
+	border-left: 3px solid #ccc;
+	color: #444;
+}
+
+a {
+	color: #1a4f8a;
+	text-decoration: none;
+}
+
+img {
+	max-width: 100%;
+}
+
+hr {
+	margin: 1.5rem 0;
+	border: 0;
+	border-top: 1px solid #ddd;
+}

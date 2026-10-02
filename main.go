@@ -15,6 +15,7 @@ import (
 	"github.com/lockyc/plate/internal/cli"
 	"github.com/lockyc/plate/internal/cutout"
 	"github.com/lockyc/plate/internal/diff"
+	"github.com/lockyc/plate/internal/doc"
 	"github.com/lockyc/plate/internal/doctor"
 	"github.com/lockyc/plate/internal/fonts"
 	"github.com/lockyc/plate/internal/grade"
@@ -44,6 +45,7 @@ var commands = []command{
 	{"render", "HTML to PNG and/or PDF with headless Chrome", render.Main, false},
 	{"press", "PDF to a print master: outlined text, CMYK, checked against a soft proof", press.Main, false},
 	{"pdf", "inspect a PDF: info with a text-layer check, text, page renders, embedded images", pdf.Main, false},
+	{"doc", "markdown or HTML to a PDF with a document stylesheet", doc.Main, false},
 	{"diff", "compare two images after lining them up vertically", diff.Main, false},
 	{"fonts", "embed web fonts into a CSS file as data: URIs", fonts.Main, false},
 	{"qr", "a QR code SVG, dark on light, quiet zone included", qr.Main, false},

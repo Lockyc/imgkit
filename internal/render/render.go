@@ -41,6 +41,9 @@ const (
 	maxPixels = 16384 * 16384
 )
 
+// defaultBudget is --budget's default, in ms.
+const defaultBudget = 5000
+
 // pdfQuantum is how far, in pt, Chrome's PDF page may sit from the size
 // asked for: it rounds page sizes to multiples of 8 CSS px (6 pt).
 const pdfQuantum = 6.0
@@ -69,7 +72,7 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	htmlOut := fs.String("html", "", "write the page's DOM here once scripts settle (a static copy with every script's work done)")
 	size := fs.String("size", "", "viewport and expected page size in CSS px, WxH (required with --png)")
 	scale := cli.Float(fs, "scale", 1, "device scale factor; the PNG is size × scale px at 96 × scale dpi")
-	budget := cli.Int(fs, "budget", 5000, "virtual-time budget in ms for scripts, fonts and images to settle")
+	budget := cli.Int(fs, "budget", defaultBudget, "virtual-time budget in ms for scripts, fonts and images to settle")
 	var failIf multi
 	fs.Var(&failIf, "fail-if", "fail when `TEXT` appears in the page: its markup (dumped DOM) for --png, its extracted text for --pdf (repeatable)")
 	rest, code, ok := cli.Parse(fs, args, 1)
@@ -113,6 +116,16 @@ func Main(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return cli.Fail(stderr, "render", err)
 	}
 	return 0
+}
+
+// PDF renders the page at path (a file or URL) to a PDF at out, under the
+// checks `plate render --pdf` runs. warn receives its warnings.
+func PDF(ctx context.Context, page, out string, warn io.Writer) error {
+	u, local, err := pageURL(page)
+	if err != nil {
+		return err
+	}
+	return job{url: u, local: local, pdf: out, scale: 1, budget: defaultBudget, warn: warn}.run(ctx)
 }
 
 func parseSize(s string) (int, int, error) {
